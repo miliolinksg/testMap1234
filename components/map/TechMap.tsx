@@ -138,7 +138,7 @@ export default function TechMap({
 
       <MapStyleSwitcher value={mapStyle} onChange={setMapStyle} />
 
-      <div className="absolute bottom-6 right-6 z-[1000] flex max-w-xs flex-col items-end gap-2">
+      <div className="absolute bottom-3 right-3 z-[1000] flex max-w-[calc(100%-5.5rem)] flex-col items-end gap-2 sm:bottom-6 sm:right-6 sm:max-w-xs">
         {locateError && (
           <div
             role="alert"
@@ -170,7 +170,7 @@ export default function TechMap({
           type="button"
           onClick={onLocate}
           disabled={isLocating}
-          className={`rounded px-4 py-2 text-sm font-medium shadow transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+          className={`rounded px-3 py-2 text-xs font-medium shadow transition-colors disabled:cursor-not-allowed disabled:opacity-60 sm:px-4 sm:text-sm ${
             isTech
               ? "border border-cyan-500/30 bg-slate-900/90 text-cyan-100 backdrop-blur hover:bg-slate-800"
               : "bg-white text-gray-800 hover:bg-gray-50"

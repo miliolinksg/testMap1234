@@ -47,8 +47,8 @@ export default function StoreList({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="space-y-3 border-b border-gray-200 p-4">
-        <h2 className="text-lg font-bold text-gray-900">門市據點</h2>
+      <div className="space-y-2 border-b border-gray-200 p-3 sm:space-y-3 sm:p-4">
+        <h2 className="text-base font-bold text-gray-900 sm:text-lg">門市據點</h2>
 
         <input
           type="search"

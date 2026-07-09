@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "門市據點",
-  description: "Google Maps 門市據點 Demo",
+  description: "門市據點地圖",
 };
 
 export default function RootLayout({

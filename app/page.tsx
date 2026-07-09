@@ -1,16 +1,21 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import Link from "next/link";
+import dynamic from "next/dynamic";
 import type { Store } from "@/types/store";
+import type { StoreFocusSource } from "@/components/map/TechMap";
 import { stores } from "@/data/stores";
 import { findNearestStore } from "@/utils/geo";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import StoreList from "@/components/StoreList";
-import GoogleMap from "@/components/GoogleMap";
+
+const LeafletMap = dynamic(() => import("@/components/LeafletMap"), {
+  ssr: false,
+});
 
 export default function HomePage() {
   const [activeStore, setActiveStore] = useState<Store | null>(null);
+  const [focusSource, setFocusSource] = useState<StoreFocusSource>("list");
   const { location, error, isLocating, locate, clearError } = useGeolocation();
 
   const handleLocate = useCallback(async () => {
@@ -19,39 +24,40 @@ export default function HomePage() {
 
     const nearest = findNearestStore(stores, coords);
     if (nearest) {
+      setFocusSource("list");
       setActiveStore(nearest);
     }
   }, [locate]);
 
   return (
-    <main className="flex h-screen flex-col md:flex-row">
-      <aside className="h-1/3 border-b border-gray-200 md:h-full md:w-[30%] md:border-b-0 md:border-r">
+    <main className="flex h-[100dvh] flex-col overflow-hidden lg:flex-row">
+      <aside className="flex min-h-0 w-full max-h-[42dvh] shrink-0 flex-col border-b border-gray-200 sm:max-h-[45dvh] lg:max-h-none lg:h-full lg:w-[min(100%,380px)] lg:max-w-[35%] lg:border-b-0 lg:border-r">
         <StoreList
           stores={stores}
           activeStoreId={activeStore?.id ?? null}
           userLocation={location}
           locateError={error}
           onClearLocateError={clearError}
-          onSelect={setActiveStore}
+          onSelect={(store) => {
+            setFocusSource("list");
+            setActiveStore(store);
+          }}
         />
       </aside>
-      <section className="relative h-2/3 md:h-full md:w-[70%]">
-        <Link
-          href="/leaflet"
-          className="absolute left-4 top-4 z-10 rounded bg-white px-4 py-2 text-sm font-medium text-gray-800 shadow hover:bg-gray-50"
-        >
-          切換到 Leaflet
-        </Link>
-        <GoogleMap
+      <section className="relative min-h-0 flex-1">
+        <LeafletMap
           stores={stores}
           activeStore={activeStore}
+          focusSource={focusSource}
           userLocation={location}
           isLocating={isLocating}
           locateError={error}
           onLocate={handleLocate}
           onClearLocateError={clearError}
-          onMarkerClick={setActiveStore}
-          onInfoWindowClose={() => setActiveStore(null)}
+          onMarkerClick={(store) => {
+            setFocusSource("marker");
+            setActiveStore(store);
+          }}
         />
       </section>
     </main>
