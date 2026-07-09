@@ -310,14 +310,12 @@ function StoreListSheet({
   onExpandedChange,
   storeCount,
   activeStoreName,
-  hidden = false,
   children,
 }: {
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   storeCount: number;
   activeStoreName?: string | null;
-  hidden?: boolean;
   children: ReactNode;
 }) {
   const [isEntering, setIsEntering] = useState(false);
@@ -338,9 +336,7 @@ function StoreListSheet({
 
   return (
     <div
-      className={`pointer-events-none fixed inset-x-0 top-0 z-[2000] lg:hidden ${
-        hidden ? "hidden" : ""
-      }`}
+      className="pointer-events-none fixed inset-x-0 top-0 z-[2000] lg:hidden"
       style={{
         ["--store-drawer-collapsed-height" as string]: STORE_DRAWER_COLLAPSED_HEIGHT,
       }}
@@ -399,8 +395,8 @@ export default function StoreLocator({ stores, className }: StoreLocatorProps) {
   const [focusSource, setFocusSource] = useState<StoreFocusSource>("list");
   const [locateRevision, setLocateRevision] = useState(0);
   const [sheetExpanded, setSheetExpanded] = useState(false);
-  const mapSectionRef = useRef<HTMLElement>(null);
-  const { isFullscreen, toggleFullscreen } = useMapFullscreen(mapSectionRef);
+  const containerRef = useRef<HTMLElement>(null);
+  const { isFullscreen, toggleFullscreen } = useMapFullscreen(containerRef);
   const { location, error, isLocating, locate, clearError } = useGeolocation();
 
   const handleLocate = useCallback(async () => {
@@ -428,6 +424,7 @@ export default function StoreLocator({ stores, className }: StoreLocatorProps) {
 
   return (
     <main
+      ref={containerRef}
       className={`relative h-[100dvh] overflow-hidden lg:flex lg:flex-row${
         className ? ` ${className}` : ""
       }`}
@@ -436,10 +433,7 @@ export default function StoreLocator({ stores, className }: StoreLocatorProps) {
         <StoreList {...listProps} />
       </aside>
 
-      <section
-        ref={mapSectionRef}
-        className="absolute inset-0 lg:relative lg:min-h-0 lg:flex-1"
-      >
+      <section className="absolute inset-0 lg:relative lg:min-h-0 lg:flex-1">
         <StoreMap
           stores={stores}
           activeStore={activeStore}
@@ -465,7 +459,6 @@ export default function StoreLocator({ stores, className }: StoreLocatorProps) {
         onExpandedChange={setSheetExpanded}
         storeCount={stores.length}
         activeStoreName={activeStore?.name}
-        hidden={isFullscreen}
       >
         <StoreList {...listProps} showTitle={false} variant="sheet" />
       </StoreListSheet>
