@@ -10,7 +10,7 @@ import {
 } from "@vis.gl/react-google-maps";
 import type { Store } from "@/types/store";
 import type { Coordinates } from "@/utils/geo";
-import { createGoogleNavigationUrl } from "@/utils/map";
+import NavigateButton from "@/components/NavigateButton";
 
 const TAIWAN_CENTER = { lat: 23.7, lng: 121 };
 const DEFAULT_ZOOM = 7;
@@ -72,14 +72,12 @@ function MapContent({
             <h3 className="font-semibold text-gray-900">{activeStore.name}</h3>
             <p className="text-sm text-gray-600">{activeStore.address}</p>
             <p className="text-sm text-gray-600">{activeStore.phone}</p>
-            <a
-              href={createGoogleNavigationUrl(activeStore)}
-              target="_blank"
-              rel="noopener noreferrer"
+            <NavigateButton
+              lat={activeStore.lat}
+              lng={activeStore.lng}
+              label={activeStore.name}
               className="inline-block rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              開始導航
-            </a>
+            />
           </div>
         </InfoWindow>
       )}

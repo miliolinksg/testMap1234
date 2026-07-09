@@ -6,7 +6,7 @@ import L from "leaflet";
 import type { Store } from "@/types/store";
 import type { MapUiVariant } from "./mapStyles";
 import LocationCard from "./LocationCard";
-import { bounceMarker } from "./markerAnimation";
+import { bounceMarker, enterMarker } from "./markerAnimation";
 
 function createGlowIcon(isActive: boolean, uiVariant: MapUiVariant) {
   const isTech = uiVariant === "tech";
@@ -40,18 +40,23 @@ interface CustomMarkerProps {
   store: Store;
   isActive: boolean;
   uiVariant: MapUiVariant;
+  enterIndex?: number;
   onClick: (store: Store) => void;
   markerRef?: (marker: L.Marker | null) => void;
 }
+
+const ENTER_STAGGER_MS = 110;
 
 export default function CustomMarker({
   store,
   isActive,
   uiVariant,
+  enterIndex = 0,
   onClick,
   markerRef,
 }: CustomMarkerProps) {
   const markerInstanceRef = useRef<L.Marker | null>(null);
+  const hasEnteredRef = useRef(false);
 
   const icon = useMemo(
     () => createGlowIcon(isActive, uiVariant),
@@ -72,6 +77,11 @@ export default function CustomMarker({
       ref={(marker) => {
         markerInstanceRef.current = marker;
         markerRef?.(marker);
+
+        if (marker && !hasEnteredRef.current) {
+          hasEnteredRef.current = true;
+          enterMarker(marker, enterIndex * ENTER_STAGGER_MS);
+        }
       }}
       eventHandlers={{ click: handleClick }}
     >

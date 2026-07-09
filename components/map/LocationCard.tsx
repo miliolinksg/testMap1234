@@ -1,5 +1,7 @@
+"use client";
+
 import type { Store } from "@/types/store";
-import { createGoogleNavigationUrl } from "@/utils/map";
+import NavigateButton from "@/components/NavigateButton";
 
 interface LocationCardProps {
   store: Store;
@@ -19,16 +21,14 @@ export default function LocationCard({
         {store.address}
       </p>
       <p className={`text-sm leading-snug ${isTech ? "text-slate-300" : "text-gray-600"}`}>{store.phone}</p>
-      <a
-        href={createGoogleNavigationUrl(store)}
-        target="_blank"
-        rel="noopener noreferrer"
+      <NavigateButton
+        lat={store.lat}
+        lng={store.lng}
+        label={store.name}
         className={`store-popup-nav-btn ${
           isTech ? "store-popup-nav-btn--tech" : "store-popup-nav-btn--normal"
         }`}
-      >
-        開始導航
-      </a>
+      />
     </div>
   );
 }

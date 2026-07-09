@@ -2,7 +2,8 @@
 
 import type { Store } from "@/types/store";
 import { formatDistance } from "@/utils/geo";
-import { createGoogleNavigationUrl, createPhoneUrl } from "@/utils/map";
+import { createPhoneUrl } from "@/utils/map";
+import NavigateButton from "@/components/NavigateButton";
 
 interface StoreItemProps {
   store: Store;
@@ -41,15 +42,13 @@ export default function StoreItem({
       </button>
 
       <div className="mt-2 flex flex-col gap-2 sm:mt-3 sm:flex-row sm:flex-wrap">
-        <a
-          href={createGoogleNavigationUrl(store)}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(event) => event.stopPropagation()}
+        <NavigateButton
+          lat={store.lat}
+          lng={store.lng}
+          label={store.name}
+          onBeforeNavigate={(event) => event.stopPropagation()}
           className="inline-flex items-center justify-center rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 sm:justify-start sm:py-1.5"
-        >
-          開始導航
-        </a>
+        />
         <a
           href={createPhoneUrl(store.phone)}
           onClick={(event) => event.stopPropagation()}

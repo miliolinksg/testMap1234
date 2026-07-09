@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import type { Store } from "@/types/store";
 import type { StoreFocusSource } from "@/components/map/TechMap";
 import { stores } from "@/data/stores";
-import { findNearestStore } from "@/utils/geo";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import StoreList from "@/components/StoreList";
 
@@ -16,17 +15,17 @@ const LeafletMap = dynamic(() => import("@/components/LeafletMap"), {
 export default function HomePage() {
   const [activeStore, setActiveStore] = useState<Store | null>(null);
   const [focusSource, setFocusSource] = useState<StoreFocusSource>("list");
+  const [locateRevision, setLocateRevision] = useState(0);
   const { location, error, isLocating, locate, clearError } = useGeolocation();
 
   const handleLocate = useCallback(async () => {
+    setActiveStore(null);
+    setFocusSource("locate");
+
     const coords = await locate();
     if (!coords) return;
 
-    const nearest = findNearestStore(stores, coords);
-    if (nearest) {
-      setFocusSource("list");
-      setActiveStore(nearest);
-    }
+    setLocateRevision((revision) => revision + 1);
   }, [locate]);
 
   return (
@@ -49,6 +48,7 @@ export default function HomePage() {
           stores={stores}
           activeStore={activeStore}
           focusSource={focusSource}
+          locateRevision={locateRevision}
           userLocation={location}
           isLocating={isLocating}
           locateError={error}

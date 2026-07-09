@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MapContainer, CircleMarker, useMap } from "react-leaflet";
+import { MapContainer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Store } from "@/types/store";
@@ -11,18 +11,21 @@ import { mapStyles } from "./mapStyles";
 import MapTileLayer from "./MapTileLayer";
 import MapStyleSwitcher from "./MapStyleSwitcher";
 import CustomMarker from "./CustomMarker";
+import UserLocationMarker from "./UserLocationMarker";
 import { openPopupWithFade, pulseMarker } from "./markerAnimation";
 
 const TAIWAN_CENTER: [number, number] = [23.7, 121];
 const DEFAULT_ZOOM = 7;
 const FOCUS_ZOOM = 16;
+const FLY_TO_DURATION = 1.4;
 
-export type StoreFocusSource = "list" | "marker";
+export type StoreFocusSource = "list" | "marker" | "locate";
 
 export interface TechMapProps {
   stores: Store[];
   activeStore: Store | null;
   focusSource?: StoreFocusSource;
+  locateRevision?: number;
   userLocation: Coordinates | null;
   isLocating?: boolean;
   locateError?: string | null;
@@ -37,6 +40,39 @@ interface MapControllerProps {
   markerRefs: React.MutableRefObject<Record<number, L.Marker>>;
 }
 
+function UserLocationController({
+  userLocation,
+  focusSource,
+  locateRevision,
+  markerRefs,
+}: {
+  userLocation: Coordinates | null;
+  focusSource: StoreFocusSource;
+  locateRevision: number;
+  markerRefs: React.MutableRefObject<Record<number, L.Marker>>;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (focusSource !== "locate") return;
+
+    Object.values(markerRefs.current).forEach((marker) => {
+      marker.closePopup();
+    });
+  }, [focusSource, locateRevision, markerRefs]);
+
+  useEffect(() => {
+    if (!userLocation || focusSource !== "locate") return;
+
+    map.flyTo([userLocation.lat, userLocation.lng], FOCUS_ZOOM, {
+      duration: FLY_TO_DURATION,
+      easeLinearity: 0.22,
+    });
+  }, [map, userLocation, focusSource, locateRevision]);
+
+  return null;
+}
+
 function MapController({
   activeStore,
   focusSource,
@@ -45,7 +81,7 @@ function MapController({
   const map = useMap();
 
   useEffect(() => {
-    if (!activeStore) return;
+    if (!activeStore || focusSource === "locate") return;
 
     const marker = markerRefs.current[activeStore.id];
     if (!marker) return;
@@ -70,6 +106,7 @@ export default function TechMap({
   stores,
   activeStore,
   focusSource = "list",
+  locateRevision = 0,
   userLocation,
   isLocating = false,
   locateError = null,
@@ -96,12 +133,13 @@ export default function TechMap({
       >
         <MapTileLayer styleKey={mapStyle} />
 
-        {stores.map((store) => (
+        {stores.map((store, index) => (
           <CustomMarker
             key={store.id}
             store={store}
             isActive={activeStore?.id === store.id}
             uiVariant={currentStyle.uiVariant}
+            enterIndex={index}
             onClick={onMarkerClick}
             markerRef={(marker) => {
               if (marker) markerRefs.current[store.id] = marker;
@@ -110,17 +148,20 @@ export default function TechMap({
         ))}
 
         {userLocation && (
-          <CircleMarker
-            center={[userLocation.lat, userLocation.lng]}
-            radius={8}
-            pathOptions={{
-              color: isTech ? "#67e8f9" : "#ffffff",
-              weight: 2,
-              fillColor: isTech ? "#22d3ee" : "#2563eb",
-              fillOpacity: 1,
-            }}
+          <UserLocationMarker
+            position={userLocation}
+            uiVariant={currentStyle.uiVariant}
+            isLocating={isLocating}
+            locateRevision={locateRevision}
           />
         )}
+
+        <UserLocationController
+          userLocation={userLocation}
+          focusSource={focusSource}
+          locateRevision={locateRevision}
+          markerRefs={markerRefs}
+        />
 
         <MapController
           activeStore={activeStore}

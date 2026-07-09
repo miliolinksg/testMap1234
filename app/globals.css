@@ -38,6 +38,38 @@ body {
   animation: marker-bounce 0.55s ease;
 }
 
+.custom-marker-pin.marker-enter {
+  opacity: 0;
+  transition: none;
+  animation: marker-enter 0.75s cubic-bezier(0.34, 1.45, 0.64, 1) both;
+  animation-delay: var(--enter-delay, 0ms);
+}
+
+@keyframes marker-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-52px) scale(0.15);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(8px) scale(1.12);
+  }
+
+  68% {
+    transform: translateY(-5px) scale(0.94);
+  }
+
+  82% {
+    transform: translateY(2px) scale(1.04);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes marker-bounce {
   0%,
   100% {
@@ -189,4 +221,194 @@ body {
 
 .leaflet-fade-anim .leaflet-tile {
   transition: opacity 0.4s linear;
+}
+
+/* 使用者定位：科幻雷達 / 輻射 ping */
+.user-location-wrapper {
+  background: transparent;
+  border: none;
+}
+
+.user-location-marker {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  transform: scale(var(--ul-scale, 1));
+  transform-origin: center center;
+  transition: transform 0.18s ease-out;
+}
+
+.user-location-aura {
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--ul-glow) 0%,
+    transparent 68%
+  );
+  animation: user-location-aura 2.8s ease-in-out infinite;
+}
+
+.user-location-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--ring-color);
+  box-shadow: 0 0 12px var(--ul-glow);
+  opacity: 0;
+  animation: user-location-radar 2.4s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+}
+
+.user-location-ring--delay {
+  animation-delay: 0.8s;
+}
+
+.user-location-ring--slow {
+  animation-delay: 1.6s;
+}
+
+.user-location-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  transform: translate(-50%, -50%);
+}
+
+.user-location-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffffff, var(--ul-primary) 45%, var(--ul-secondary) 100%);
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 0 10px var(--ul-primary),
+    0 0 22px var(--ul-glow);
+  animation: user-location-dot-pulse 2s ease-in-out infinite;
+}
+
+.user-location-marker.is-tech .user-location-dot {
+  border-color: #e0f2fe;
+}
+
+.user-location-marker.is-locating .user-location-ring {
+  animation-duration: 1.3s;
+}
+
+.user-location-marker.is-locating .user-location-dot {
+  animation-duration: 0.75s;
+}
+
+.user-location-marker.user-location-burst .user-location-aura {
+  animation: user-location-burst-aura 0.85s ease-out;
+}
+
+.user-location-marker.user-location-burst .user-location-ring {
+  animation: user-location-burst-ring 0.85s ease-out;
+}
+
+.user-location-marker.user-location-burst .user-location-dot {
+  animation: user-location-burst-core 0.85s ease-out;
+}
+
+@keyframes user-location-aura {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.55;
+  }
+
+  50% {
+    transform: scale(1.08);
+    opacity: 0.9;
+  }
+}
+
+@keyframes user-location-radar {
+  0% {
+    transform: scale(0.25);
+    opacity: 0.9;
+  }
+
+  70% {
+    opacity: 0.2;
+  }
+
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+@keyframes user-location-dot-pulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow:
+      0 0 10px var(--ul-primary),
+      0 0 22px var(--ul-glow);
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(1.15);
+    box-shadow:
+      0 0 14px var(--ul-primary),
+      0 0 32px var(--ul-glow),
+      0 0 48px var(--ul-secondary);
+  }
+}
+
+@keyframes user-location-burst-aura {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.3;
+  }
+
+  40% {
+    transform: scale(1.5);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+}
+
+@keyframes user-location-burst-ring {
+  0% {
+    transform: scale(0.2);
+    opacity: 1;
+    border-width: 4px;
+  }
+
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+    border-width: 1px;
+  }
+}
+
+@keyframes user-location-burst-core {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+
+  35% {
+    transform: translate(-50%, -50%) scale(1.45);
+  }
+
+  65% {
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
 }

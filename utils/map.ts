@@ -1,5 +1,10 @@
 import type { Store } from "@/types/store";
 
+export function createPhoneUrl(phone: string): string {
+  return `tel:${phone.replace(/[^\d+]/g, "")}`;
+}
+
+/** @deprecated Use navigateToLocation from @/utils/navigation instead. */
 export function createGoogleNavigationUrl(
   store: Pick<Store, "lat" | "lng">,
 ): string {
@@ -11,8 +16,4 @@ export function createGoogleNavigationUrl(
     dir_action: "navigate",
   });
   return `https://www.google.com/maps/dir/?${params.toString()}`;
-}
-
-export function createPhoneUrl(phone: string): string {
-  return `tel:${phone.replace(/[^\d+]/g, "")}`;
 }
