@@ -13,6 +13,22 @@ body {
     env(safe-area-inset-left);
 }
 
+/* 手機偽全螢幕（iOS 等不支援原生 Fullscreen API 時） */
+body.map-fullscreen-active {
+  overflow: hidden;
+}
+
+.map-pseudo-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 4000 !important;
+  width: 100% !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 :root {
   --store-drawer-collapsed-height: 3.25rem;
   --map-attribution-bottom: env(safe-area-inset-bottom, 0px);

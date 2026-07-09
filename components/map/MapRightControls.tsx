@@ -1,12 +1,14 @@
 "use client";
 
-import { LocateFixed, Minus, Plus, X } from "lucide-react";
+import { LocateFixed, Maximize2, Minimize2, Minus, Plus, X } from "lucide-react";
 import { useMap } from "react-leaflet";
 
 interface MapRightControlsProps {
   isLocating?: boolean;
   locateError?: string | null;
   isTech?: boolean;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
   onLocate: () => void;
   onClearLocateError?: () => void;
 }
@@ -15,6 +17,8 @@ export default function MapRightControls({
   isLocating = false,
   locateError = null,
   isTech = false,
+  isFullscreen = false,
+  onToggleFullscreen,
   onLocate,
   onClearLocateError,
 }: MapRightControlsProps) {
@@ -27,6 +31,11 @@ export default function MapRightControls({
   const zoomButtonClass = `flex h-10 w-10 items-center justify-center text-xl font-light transition-colors hover:opacity-90 ${
     isTech ? "hover:bg-slate-800" : "hover:bg-gray-50"
   }`;
+
+  const handleToggleFullscreen = () => {
+    onToggleFullscreen?.();
+    window.setTimeout(() => map.invalidateSize(), 120);
+  };
 
   return (
     <div className="map-right-controls pointer-events-none absolute inset-0 z-[1000] lg:hidden">
@@ -56,6 +65,22 @@ export default function MapRightControls({
               )}
             </div>
           </div>
+        )}
+
+        {onToggleFullscreen && (
+          <button
+            type="button"
+            onClick={handleToggleFullscreen}
+            aria-label={isFullscreen ? "離開全螢幕" : "全螢幕"}
+            title={isFullscreen ? "離開全螢幕" : "全螢幕"}
+            className={`flex h-11 w-11 items-center justify-center rounded-full border shadow-lg transition-colors ${surfaceClass}`}
+          >
+            {isFullscreen ? (
+              <Minimize2 className="h-5 w-5" aria-hidden />
+            ) : (
+              <Maximize2 className="h-5 w-5" aria-hidden />
+            )}
+          </button>
         )}
 
         <button

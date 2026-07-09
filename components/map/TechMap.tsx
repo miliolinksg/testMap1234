@@ -33,6 +33,8 @@ export interface TechMapProps {
   locateError?: string | null;
   onLocate: () => void;
   onClearLocateError?: () => void;
+  isMapFullscreen?: boolean;
+  onToggleMapFullscreen?: () => void;
   onMarkerClick: (store: Store) => void;
 }
 
@@ -114,6 +116,8 @@ export default function TechMap({
   locateError = null,
   onLocate,
   onClearLocateError,
+  isMapFullscreen = false,
+  onToggleMapFullscreen,
   onMarkerClick,
 }: TechMapProps) {
   const [mapStyle, setMapStyle] = useState<MapStyleKey>("emap6");
@@ -176,6 +180,8 @@ export default function TechMap({
           isLocating={isLocating}
           locateError={locateError}
           isTech={isTech}
+          isFullscreen={isMapFullscreen}
+          onToggleFullscreen={onToggleMapFullscreen}
           onLocate={onLocate}
           onClearLocateError={onClearLocateError}
         />

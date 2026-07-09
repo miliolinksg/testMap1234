@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { Store } from "@/types/store";
 import type { StoreFocusSource } from "@/components/map/TechMap";
 import { stores } from "@/data/stores";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { useMapFullscreen } from "@/hooks/useMapFullscreen";
 import StoreList from "@/components/StoreList";
 import StoreListSheet from "@/components/StoreListSheet";
 
@@ -22,6 +23,8 @@ export default function HomePage() {
   const [focusSource, setFocusSource] = useState<StoreFocusSource>("list");
   const [locateRevision, setLocateRevision] = useState(0);
   const [sheetExpanded, setSheetExpanded] = useState(false);
+  const mapSectionRef = useRef<HTMLElement>(null);
+  const { isFullscreen, toggleFullscreen } = useMapFullscreen(mapSectionRef);
   const { location, error, isLocating, locate, clearError } = useGeolocation();
 
   const handleLocate = useCallback(async () => {
@@ -57,7 +60,10 @@ export default function HomePage() {
       </aside>
 
       {/* 手機：地圖全螢幕；桌面：右側地圖 */}
-      <section className="absolute inset-0 lg:relative lg:min-h-0 lg:flex-1">
+      <section
+        ref={mapSectionRef}
+        className="absolute inset-0 lg:relative lg:min-h-0 lg:flex-1"
+      >
         <LeafletMap
           stores={stores}
           activeStore={activeStore}
@@ -68,6 +74,8 @@ export default function HomePage() {
           locateError={error}
           onLocate={handleLocate}
           onClearLocateError={clearError}
+          isMapFullscreen={isFullscreen}
+          onToggleMapFullscreen={toggleFullscreen}
           onMarkerClick={(store) => {
             setFocusSource("marker");
             setActiveStore(store);
@@ -82,6 +90,7 @@ export default function HomePage() {
         onExpandedChange={setSheetExpanded}
         storeCount={stores.length}
         activeStoreName={activeStore?.name}
+        hidden={isFullscreen}
       >
         <StoreList {...listProps} showTitle={false} variant="sheet" />
       </StoreListSheet>

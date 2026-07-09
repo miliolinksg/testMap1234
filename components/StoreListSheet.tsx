@@ -11,6 +11,7 @@ interface StoreListSheetProps {
   onExpandedChange: (expanded: boolean) => void;
   storeCount: number;
   activeStoreName?: string | null;
+  hidden?: boolean;
   children: ReactNode;
 }
 
@@ -30,6 +31,7 @@ export default function StoreListSheet({
   onExpandedChange,
   storeCount,
   activeStoreName,
+  hidden = false,
   children,
 }: StoreListSheetProps) {
   const [isEntering, setIsEntering] = useState(false);
@@ -51,7 +53,9 @@ export default function StoreListSheet({
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 top-0 z-[2000] lg:hidden"
+      className={`pointer-events-none fixed inset-x-0 top-0 z-[2000] lg:hidden ${
+        hidden ? "hidden" : ""
+      }`}
       style={{
         ["--store-drawer-collapsed-height" as string]: STORE_DRAWER_COLLAPSED_HEIGHT,
       }}
