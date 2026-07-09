@@ -429,7 +429,7 @@ export default function StoreLocator({ stores, className }: StoreLocatorProps) {
         className ? ` ${className}` : ""
       }`}
     >
-      <aside className="hidden min-h-0 w-[min(100%,380px)] max-w-[35%] shrink-0 flex-col overflow-hidden rounded-r-[1.75rem] border border-gray-200/80 bg-white shadow-[4px_0_24px_rgba(15,23,42,0.06)] lg:flex lg:h-full">
+      <aside className="hidden min-h-0 w-[min(100%,380px)] max-w-[35%] shrink-0 flex-col overflow-hidden border border-gray-200/80 bg-white shadow-[4px_0_24px_rgba(15,23,42,0.06)] lg:flex lg:h-full">
         <StoreList {...listProps} />
       </aside>
 
