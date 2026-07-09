@@ -1,34 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import type { Store } from "@/types/store";
+import { stores } from "@/data/stores";
 import { findNearestStore } from "@/utils/geo";
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { getStores } from "@/services/storeService";
 import StoreList from "@/components/StoreList";
 import GoogleMap from "@/components/GoogleMap";
 
 export default function HomePage() {
-  const [stores, setStores] = useState<Store[]>([]);
   const [activeStore, setActiveStore] = useState<Store | null>(null);
   const { location, error, isLocating, locate, clearError } = useGeolocation();
 
-  useEffect(() => {
-    getStores()
-      .then(setStores)
-      .catch((fetchError) => console.error(fetchError));
-  }, []);
-
   const handleLocate = useCallback(async () => {
     const coords = await locate();
-    if (!coords || stores.length === 0) return;
+    if (!coords) return;
 
     const nearest = findNearestStore(stores, coords);
     if (nearest) {
       setActiveStore(nearest);
     }
-  }, [locate, stores]);
+  }, [locate]);
 
   return (
     <main className="flex h-screen flex-col md:flex-row">
