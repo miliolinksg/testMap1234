@@ -1,4 +1,4 @@
-import type { Store } from "@/types/store";
+import type { Store } from "@/components/StoreLocator/lib";
 
 export const stores: Store[] = [
   {
@@ -8,7 +8,6 @@ export const stores: Store[] = [
     phone: "02-1234-5678",
     lat: 25.0359,
     lng: 121.5645,
-    placeId: "",
   },
   {
     id: 2,
@@ -17,7 +16,6 @@ export const stores: Store[] = [
     phone: "04-2345-6789",
     lat: 24.1657,
     lng: 120.6478,
-    placeId: "",
   },
   {
     id: 3,
@@ -26,6 +24,5 @@ export const stores: Store[] = [
     phone: "07-3456-7890",
     lat: 22.6086,
     lng: 120.3006,
-    placeId: "",
   },
 ];
