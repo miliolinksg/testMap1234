@@ -10,6 +10,7 @@ import {
   type StoreWithDistance,
 } from "@/utils/geo";
 import StoreItem from "./StoreItem";
+import StoreListScrollArea from "./StoreListScrollArea";
 
 interface StoreListProps {
   stores: Store[];
@@ -18,6 +19,8 @@ interface StoreListProps {
   locateError?: string | null;
   onClearLocateError?: () => void;
   onSelect: (store: Store) => void;
+  showTitle?: boolean;
+  variant?: "sidebar" | "sheet";
 }
 
 export default function StoreList({
@@ -27,6 +30,8 @@ export default function StoreList({
   locateError = null,
   onClearLocateError,
   onSelect,
+  showTitle = true,
+  variant = "sidebar",
 }: StoreListProps) {
   const [query, setQuery] = useState("");
   const [sortByDistance, setSortByDistance] = useState(true);
@@ -46,16 +51,18 @@ export default function StoreList({
   }, [stores, query, userLocation, sortByDistance]);
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="space-y-2 border-b border-gray-200 p-3 sm:space-y-3 sm:p-4">
-        <h2 className="text-base font-bold text-gray-900 sm:text-lg">門市據點</h2>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 space-y-2 border-b border-gray-200/80 p-3 sm:space-y-3 sm:p-4">
+        {showTitle && (
+          <h2 className="text-base font-bold text-gray-900 sm:text-lg">門市據點</h2>
+        )}
 
         <input
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="搜尋店名、地址、電話..."
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
         />
 
         {userLocation && (
@@ -92,7 +99,7 @@ export default function StoreList({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <StoreListScrollArea variant={variant}>
         {displayStores.length === 0 ? (
           <p className="p-4 text-sm text-gray-500">找不到符合條件的門市</p>
         ) : (
@@ -108,7 +115,7 @@ export default function StoreList({
             />
           ))
         )}
-      </div>
+      </StoreListScrollArea>
     </div>
   );
 }

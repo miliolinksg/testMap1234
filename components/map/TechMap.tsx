@@ -10,6 +10,8 @@ import type { MapStyleKey } from "./mapStyles";
 import { mapStyles } from "./mapStyles";
 import MapTileLayer from "./MapTileLayer";
 import MapStyleSwitcher from "./MapStyleSwitcher";
+import MapRightControls from "./MapRightControls";
+import MapLocateControl from "./MapLocateControl";
 import CustomMarker from "./CustomMarker";
 import UserLocationMarker from "./UserLocationMarker";
 import { openPopupWithFade, pulseMarker } from "./markerAnimation";
@@ -114,7 +116,7 @@ export default function TechMap({
   onClearLocateError,
   onMarkerClick,
 }: TechMapProps) {
-  const [mapStyle, setMapStyle] = useState<MapStyleKey>("emap");
+  const [mapStyle, setMapStyle] = useState<MapStyleKey>("emap6");
   const markerRefs = useRef<Record<number, L.Marker>>({});
   const currentStyle = mapStyles[mapStyle];
   const isTech = currentStyle.uiVariant === "tech";
@@ -129,6 +131,7 @@ export default function TechMap({
         center={TAIWAN_CENTER}
         zoom={DEFAULT_ZOOM}
         scrollWheelZoom
+        zoomControl={false}
         className="h-full w-full z-0"
       >
         <MapTileLayer styleKey={mapStyle} />
@@ -168,6 +171,22 @@ export default function TechMap({
           focusSource={focusSource}
           markerRefs={markerRefs}
         />
+
+        <MapRightControls
+          isLocating={isLocating}
+          locateError={locateError}
+          isTech={isTech}
+          onLocate={onLocate}
+          onClearLocateError={onClearLocateError}
+        />
+
+        <MapLocateControl
+          isLocating={isLocating}
+          locateError={locateError}
+          isTech={isTech}
+          onLocate={onLocate}
+          onClearLocateError={onClearLocateError}
+        />
       </MapContainer>
 
       {isTech && (
@@ -177,49 +196,7 @@ export default function TechMap({
         />
       )}
 
-      <MapStyleSwitcher value={mapStyle} onChange={setMapStyle} />
-
-      <div className="absolute bottom-3 right-3 z-[1000] flex max-w-[calc(100%-5.5rem)] flex-col items-end gap-2 sm:bottom-6 sm:right-6 sm:max-w-xs">
-        {locateError && (
-          <div
-            role="alert"
-            className={`w-full rounded-md border px-3 py-2 text-sm shadow ${
-              isTech
-                ? "border-red-400/30 bg-slate-900/95 text-red-300"
-                : "border-red-200 bg-red-50 text-red-700"
-            }`}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <p>{locateError}</p>
-              {onClearLocateError && (
-                <button
-                  type="button"
-                  onClick={onClearLocateError}
-                  className={`shrink-0 ${
-                    isTech ? "text-red-400 hover:text-red-200" : "text-red-500 hover:text-red-700"
-                  }`}
-                  aria-label="關閉提示"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={onLocate}
-          disabled={isLocating}
-          className={`rounded px-3 py-2 text-xs font-medium shadow transition-colors disabled:cursor-not-allowed disabled:opacity-60 sm:px-4 sm:text-sm ${
-            isTech
-              ? "border border-cyan-500/30 bg-slate-900/90 text-cyan-100 backdrop-blur hover:bg-slate-800"
-              : "bg-white text-gray-800 hover:bg-gray-50"
-          }`}
-        >
-          {isLocating ? "定位中..." : "定位目前位置"}
-        </button>
-      </div>
+      <MapStyleSwitcher value={mapStyle} onChange={setMapStyle} isTech={isTech} />
     </div>
   );
 }

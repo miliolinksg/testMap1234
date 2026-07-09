@@ -11,7 +11,7 @@ import {
 } from "./mapStyles";
 
 const FADE_DURATION_MS = 400;
-const PHOTO_WITH_LABEL_STYLES: MapStyleKey[] = ["photo2", "photo_mix"];
+const PHOTO_WITH_LABEL_STYLES: MapStyleKey[] = ["photo2"];
 const LABEL_OVERLAY_URL = buildNlscWmtsUrl("EMAP2");
 const LABEL_OVERLAY_OPACITY = 0.85;
 
@@ -57,6 +57,10 @@ export default function MapTileLayer({ styleKey }: MapTileLayerProps) {
   const overlayRef = useRef<L.TileLayer | null>(null);
 
   useEffect(() => {
+    map.attributionControl.setPrefix(false);
+  }, [map]);
+
+  useEffect(() => {
     const style = mapStyles[styleKey];
     const nextLayer = L.tileLayer(style.url, {
       attribution: style.attribution,
@@ -71,7 +75,7 @@ export default function MapTileLayer({ styleKey }: MapTileLayerProps) {
     if (needsLabelOverlay) {
       if (!overlayRef.current) {
         const overlay = L.tileLayer(LABEL_OVERLAY_URL, {
-          attribution: NLSC_ATTRIBUTION,
+          attribution: "",
           maxZoom: 19,
           opacity: LABEL_OVERLAY_OPACITY,
         });
