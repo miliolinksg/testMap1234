@@ -1,45 +1,222 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, MapPin, Phone } from "lucide-react";
 import {
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
+  type MouseEvent,
   type ReactNode,
 } from "react";
-import { StoreListScrollArea } from "./StoreListScrollArea";
-import { StoreItem } from "./StoreItem";
-import ShowroomLayout from "./ShowroomLayout";
 import {
   type Store,
   type StoreWithDistance,
   attachDistances,
+  createPhoneUrl,
   filterStores,
+  formatDistance,
+  getNavigationWebFallbackUrl,
+  navigateToLocation,
   sortStoresByDistance,
+  useStoreLocatorState,
 } from "./lib";
-import { useStoreLocatorState } from "./useStoreLocatorState";
 
 const StoreMap = dynamic(() => import("./Map"), { ssr: false });
 
-export type { Store, StoreFocusSource, StoreRegion } from "./lib";
+export type { Store, StoreFocusSource } from "./lib";
 export type { StoreMapProps } from "./Map";
-export { STORE_REGION_OPTIONS } from "./lib";
-export { default as StoreLocatorShowroom } from "./ShowroomLayout";
-export type { ShowroomLayoutProps as StoreLocatorShowroomProps } from "./ShowroomLayout";
-export { VariantSwitcher } from "./VariantSwitcher";
-
-export type StoreLocatorVariant = "default" | "showroom";
 
 export interface StoreLocatorProps {
   stores: Store[];
   className?: string;
-  /** default：左側列表 + 全螢幕地圖；showroom：頂部篩選 + 左地圖右列表 */
-  variant?: StoreLocatorVariant;
-  /** showroom 版型標題 */
-  title?: string;
+}
+
+// ─── Navigate link ───────────────────────────────────────────────────────────
+
+function NavigateLink({
+  lat,
+  lng,
+  label,
+  className,
+  children = "開始導航",
+  onBeforeNavigate,
+}: {
+  lat: number;
+  lng: number;
+  label?: string;
+  className?: string;
+  children?: ReactNode;
+  onBeforeNavigate?: (event: MouseEvent<HTMLAnchorElement>) => void;
+}) {
+  return (
+    <a
+      href={getNavigationWebFallbackUrl(lat, lng, label)}
+      className={className}
+      onClick={(event) => {
+        event.preventDefault();
+        onBeforeNavigate?.(event);
+        navigateToLocation(lat, lng, label);
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
+// ─── Store list scroll ───────────────────────────────────────────────────────
+
+function StoreListScrollArea({
+  children,
+  variant = "sidebar",
+}: {
+  children: ReactNode;
+  variant?: "sidebar" | "sheet";
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [metrics, setMetrics] = useState({
+    scrollable: false,
+    thumbTop: 0,
+    thumbHeight: 0,
+  });
+
+  const updateMetrics = useCallback(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+
+    const scrollable = element.scrollHeight > element.clientHeight + 2;
+    const viewport = element.clientHeight;
+    const content = element.scrollHeight;
+    const thumbHeight = scrollable
+      ? Math.max((viewport / content) * viewport, 28)
+      : 0;
+    const maxThumbTop = viewport - thumbHeight;
+    const scrollRatio =
+      content <= viewport ? 0 : element.scrollTop / (content - viewport);
+    const thumbTop = scrollable ? scrollRatio * maxThumbTop : 0;
+
+    setMetrics({ scrollable, thumbTop, thumbHeight });
+  }, []);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+
+    updateMetrics();
+    const observer = new ResizeObserver(updateMetrics);
+    observer.observe(element);
+    if (element.firstElementChild) observer.observe(element.firstElementChild);
+    return () => observer.disconnect();
+  }, [children, updateMetrics]);
+
+  return (
+    <div className="relative min-h-0 flex-1">
+      <div
+        ref={scrollRef}
+        onScroll={updateMetrics}
+        className={`store-list-scroll h-full overscroll-contain ${
+          metrics.scrollable ? "store-list-scroll--active is-scrollable" : ""
+        } ${variant === "sheet" ? "store-list-scroll--sheet" : ""}`}
+      >
+        {children}
+      </div>
+
+      {metrics.scrollable && (
+        <div className="store-list-scrollbar" aria-hidden>
+          <div className="store-list-scrollbar-track">
+            <div
+              className="store-list-scrollbar-thumb"
+              style={{
+                height: `${metrics.thumbHeight}px`,
+                transform: `translateY(${metrics.thumbTop}px)`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Store item ──────────────────────────────────────────────────────────────
+
+function StoreItem({
+  store,
+  isActive,
+  distanceKm,
+  onSelect,
+}: {
+  store: Store;
+  isActive: boolean;
+  distanceKm?: number;
+  onSelect: (store: Store) => void;
+}) {
+  const hasImage = Boolean(store.imageUrl);
+
+  return (
+    <article
+      className={`store-item store-item--card ${
+        hasImage ? "store-item--with-image" : ""
+      } ${isActive ? "store-item--active" : ""}`}
+    >
+      <button
+        type="button"
+        onClick={() => onSelect(store)}
+        className="store-item__main"
+      >
+        {hasImage && (
+          <div className="store-item__media">
+            <img
+              src={store.imageUrl}
+              alt=""
+              className="store-item__image"
+              loading="lazy"
+            />
+          </div>
+        )}
+
+        <div className="store-item__content">
+          <div className="store-item__header">
+            <h3 className="store-item__title">{store.name}</h3>
+            {distanceKm !== undefined && (
+              <span className="store-item__distance">
+                {formatDistance(distanceKm)}
+              </span>
+            )}
+          </div>
+
+          <p className="store-item__meta">
+            <MapPin className="store-item__meta-icon" aria-hidden />
+            <span>{store.address}</span>
+          </p>
+
+          <p className="store-item__meta">
+            <Phone className="store-item__meta-icon" aria-hidden />
+            <span>{store.phone}</span>
+          </p>
+        </div>
+      </button>
+
+      <div className="store-item__actions">
+        <NavigateLink
+          lat={store.lat}
+          lng={store.lng}
+          label={store.name}
+          onBeforeNavigate={(event) => event.stopPropagation()}
+          className="store-item__btn store-item__btn--primary"
+        />
+        <a
+          href={createPhoneUrl(store.phone)}
+          onClick={(event) => event.stopPropagation()}
+          className="store-item__btn store-item__btn--secondary"
+        >
+          撥打電話
+        </a>
+      </div>
+    </article>
+  );
 }
 
 // ─── Store list ──────────────────────────────────────────────────────────────
@@ -232,9 +409,9 @@ function StoreListSheet({
   );
 }
 
-// ─── Default layout ──────────────────────────────────────────────────────────
+// ─── Main export ─────────────────────────────────────────────────────────────
 
-function DefaultStoreLocator({ stores, className }: StoreLocatorProps) {
+export default function StoreLocator({ stores, className }: StoreLocatorProps) {
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const {
     activeStore,
@@ -315,19 +492,4 @@ function DefaultStoreLocator({ stores, className }: StoreLocatorProps) {
       </StoreListSheet>
     </main>
   );
-}
-
-// ─── Main export ─────────────────────────────────────────────────────────────
-
-export default function StoreLocator({
-  stores,
-  className,
-  variant = "default",
-  title,
-}: StoreLocatorProps) {
-  if (variant === "showroom") {
-    return <ShowroomLayout stores={stores} className={className} title={title} />;
-  }
-
-  return <DefaultStoreLocator stores={stores} className={className} />;
 }
