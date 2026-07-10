@@ -454,6 +454,22 @@ function MapControlStack({
     window.setTimeout(() => map.invalidateSize(), 120);
   };
 
+  const fullscreenButton = onToggleFullscreen ? (
+    <button
+      type="button"
+      onClick={handleToggleFullscreen}
+      aria-label={isFullscreen ? "離開全螢幕" : "全螢幕"}
+      title={isFullscreen ? "離開全螢幕" : "全螢幕"}
+      className={`flex h-11 w-11 items-center justify-center rounded-full border shadow-lg transition-colors ${surfaceClass}`}
+    >
+      {isFullscreen ? (
+        <Minimize2 className="h-5 w-5" aria-hidden />
+      ) : (
+        <Maximize2 className="h-5 w-5" aria-hidden />
+      )}
+    </button>
+  ) : null;
+
   const rootClass =
     layout === "mobile"
       ? "map-right-controls pointer-events-none absolute inset-0 z-[1000] lg:hidden"
@@ -494,21 +510,7 @@ function MapControlStack({
           </div>
         )}
 
-        {layout === "mobile" && onToggleFullscreen && (
-          <button
-            type="button"
-            onClick={handleToggleFullscreen}
-            aria-label={isFullscreen ? "離開全螢幕" : "全螢幕"}
-            title={isFullscreen ? "離開全螢幕" : "全螢幕"}
-            className={`flex h-11 w-11 items-center justify-center rounded-full border shadow-lg transition-colors ${surfaceClass}`}
-          >
-            {isFullscreen ? (
-              <Minimize2 className="h-5 w-5" aria-hidden />
-            ) : (
-              <Maximize2 className="h-5 w-5" aria-hidden />
-            )}
-          </button>
-        )}
+        {fullscreenButton}
 
         <button
           type="button"
@@ -934,6 +936,116 @@ function RegionViewportController({
   return null;
 }
 
+function shouldRestrictMapTouch(isFullscreen: boolean): boolean {
+  if (isFullscreen) return false;
+  if (typeof window === "undefined") return false;
+  return !window.matchMedia("(min-width: 1024px) and (hover: hover)").matches;
+}
+
+function MapTouchInteractionGuard({
+  isFullscreen,
+  onHintChange,
+}: {
+  isFullscreen: boolean;
+  onHintChange: (visible: boolean) => void;
+}) {
+  const map = useMap();
+  const hintTimerRef = useRef<number>();
+  const restrictRef = useRef(false);
+
+  const showHint = useCallback(() => {
+    onHintChange(true);
+    window.clearTimeout(hintTimerRef.current);
+    hintTimerRef.current = window.setTimeout(() => onHintChange(false), 2500);
+  }, [onHintChange]);
+
+  const setMapInteraction = useCallback(
+    (enabled: boolean) => {
+      if (enabled) {
+        map.dragging.enable();
+        map.touchZoom.enable();
+        map.doubleClickZoom.enable();
+        map.boxZoom.enable();
+        map.scrollWheelZoom.enable();
+        return;
+      }
+
+      map.dragging.disable();
+      map.touchZoom.disable();
+      map.doubleClickZoom.disable();
+      map.boxZoom.disable();
+      map.scrollWheelZoom.disable();
+    },
+    [map],
+  );
+
+  useEffect(() => {
+    const applyMode = () => {
+      const restricted = shouldRestrictMapTouch(isFullscreen);
+      restrictRef.current = restricted;
+
+      if (!restricted) {
+        setMapInteraction(true);
+        onHintChange(false);
+        return;
+      }
+
+      setMapInteraction(false);
+    };
+
+    applyMode();
+
+    const desktopMq = window.matchMedia("(min-width: 1024px) and (hover: hover)");
+    desktopMq.addEventListener("change", applyMode);
+    return () => {
+      desktopMq.removeEventListener("change", applyMode);
+      window.clearTimeout(hintTimerRef.current);
+    };
+  }, [isFullscreen, onHintChange, setMapInteraction]);
+
+  useEffect(() => {
+    const container = map.getContainer();
+
+    const onTouchStart = (event: TouchEvent) => {
+      if (!restrictRef.current) return;
+
+      if (event.touches.length === 1) {
+        showHint();
+        return;
+      }
+
+      if (event.touches.length >= 2) {
+        onHintChange(false);
+        setMapInteraction(true);
+      }
+    };
+
+    const onTouchMove = (event: TouchEvent) => {
+      if (!restrictRef.current) return;
+      if (event.touches.length === 1) showHint();
+    };
+
+    const onTouchEnd = (event: TouchEvent) => {
+      if (!restrictRef.current) return;
+      if (event.touches.length < 2) setMapInteraction(false);
+    };
+
+    container.addEventListener("touchstart", onTouchStart, { passive: true });
+    container.addEventListener("touchmove", onTouchMove, { passive: true });
+    container.addEventListener("touchend", onTouchEnd, { passive: true });
+    container.addEventListener("touchcancel", onTouchEnd, { passive: true });
+
+    return () => {
+      container.removeEventListener("touchstart", onTouchStart);
+      container.removeEventListener("touchmove", onTouchMove);
+      container.removeEventListener("touchend", onTouchEnd);
+      container.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, [map, onHintChange, setMapInteraction, showHint]);
+
+  return null;
+}
+
 export default function StoreMap({
   stores,
   activeStore,
@@ -950,6 +1062,7 @@ export default function StoreMap({
   regionViewportKey,
 }: StoreMapProps) {
   const [mapStyle, setMapStyle] = useState<MapStyleKey>("emap6");
+  const [touchHintVisible, setTouchHintVisible] = useState(false);
   const markerRefs = useRef<Record<number, L.Marker>>({});
   const currentStyle = mapStyles[mapStyle];
   const isTech = currentStyle.uiVariant === "tech";
@@ -960,10 +1073,17 @@ export default function StoreMap({
         isTech ? "bg-slate-950" : "bg-gray-100"
       }`}
     >
+      {touchHintVisible && (
+        <div className="map-touch-hint" role="status" aria-live="polite">
+          <p className="map-touch-hint__title">同時以兩指移動地圖</p>
+          <p className="map-touch-hint__sub">或點擊右下角全螢幕按鈕操作地圖</p>
+        </div>
+      )}
+
       <MapContainer
         center={TAIWAN_CENTER}
         zoom={DEFAULT_ZOOM}
-        scrollWheelZoom
+        scrollWheelZoom={false}
         zoomControl={false}
         className="h-full w-full z-0"
       >
@@ -1012,6 +1132,11 @@ export default function StoreMap({
           />
         )}
 
+        <MapTouchInteractionGuard
+          isFullscreen={isMapFullscreen}
+          onHintChange={setTouchHintVisible}
+        />
+
         <MapControlStack
           layout="mobile"
           isLocating={isLocating}
@@ -1028,6 +1153,8 @@ export default function StoreMap({
           isLocating={isLocating}
           locateError={locateError}
           isTech={isTech}
+          isFullscreen={isMapFullscreen}
+          onToggleFullscreen={onToggleMapFullscreen}
           onLocate={onLocate}
           onClearLocateError={onClearLocateError}
         />
