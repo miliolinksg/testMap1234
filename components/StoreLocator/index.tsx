@@ -1,241 +1,141 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { ChevronDown } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import { StoreListScrollArea } from "./StoreListScrollArea";
-import { StoreItem } from "./StoreItem";
-import ShowroomLayout from "./ShowroomLayout";
+import { MapPin, Phone } from "lucide-react";
+import { useMemo, useState } from "react";
 import {
   type Store,
+  type StoreRegion,
   type StoreWithDistance,
+  STORE_REGION_OPTIONS,
   attachDistances,
-  filterStores,
+  createPhoneUrl,
+  filterStoresByRegion,
+  formatDistance,
+  getNavigationWebFallbackUrl,
+  navigateToLocation,
   sortStoresByDistance,
+  useStoreLocatorState,
 } from "./lib";
-import { useStoreLocatorState } from "./useStoreLocatorState";
+import "./styles.css";
 
 const StoreMap = dynamic(() => import("./Map"), { ssr: false });
 
 export type { Store, StoreFocusSource, StoreRegion } from "./lib";
 export type { StoreMapProps } from "./Map";
 export { STORE_REGION_OPTIONS } from "./lib";
-export { default as StoreLocatorShowroom } from "./ShowroomLayout";
-export type { ShowroomLayoutProps as StoreLocatorShowroomProps } from "./ShowroomLayout";
-export { VariantSwitcher } from "./VariantSwitcher";
-
-export type StoreLocatorVariant = "default" | "showroom";
 
 export interface StoreLocatorProps {
   stores: Store[];
   className?: string;
-  /** default：左側列表 + 全螢幕地圖；showroom：頂部篩選 + 左地圖右列表 */
-  variant?: StoreLocatorVariant;
-  /** showroom 版型標題 */
   title?: string;
 }
 
-// ─── Store list ──────────────────────────────────────────────────────────────
+function StoreItem({
+  store,
+  isActive,
+  distanceKm,
+  onSelect,
+}: {
+  store: Store;
+  isActive: boolean;
+  distanceKm?: number;
+  onSelect: (store: Store) => void;
+}) {
+  return (
+    <article
+      className={`store-item store-item--list ${store.imageUrl ? "store-item--with-image" : ""} ${
+        isActive ? "store-item--active" : ""
+      }`}
+    >
+      <button type="button" onClick={() => onSelect(store)} className="store-item__main">
+        {store.imageUrl && (
+          <div className="store-item__media">
+            <img src={store.imageUrl} alt="" className="store-item__image" loading="lazy" />
+          </div>
+        )}
+        <div className="store-item__content">
+          <div className="store-item__header">
+            <h3 className="store-item__title">{store.name}</h3>
+            {distanceKm !== undefined && (
+              <span className="store-item__distance">{formatDistance(distanceKm)}</span>
+            )}
+          </div>
+          <p className="store-item__meta">
+            <MapPin className="store-item__meta-icon" aria-hidden />
+            <span>{store.address}</span>
+          </p>
+          <p className="store-item__meta">
+            <Phone className="store-item__meta-icon" aria-hidden />
+            <span>{store.phone}</span>
+          </p>
+        </div>
+      </button>
+      <div className="store-item__actions">
+        <a
+          href={getNavigationWebFallbackUrl(store.lat, store.lng)}
+          className="store-item__btn store-item__btn--primary"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            navigateToLocation(store.lat, store.lng, store.name);
+          }}
+        >
+          開始導航
+        </a>
+        <a
+          href={createPhoneUrl(store.phone)}
+          onClick={(event) => event.stopPropagation()}
+          className="store-item__btn store-item__btn--secondary"
+        >
+          撥打電話
+        </a>
+      </div>
+    </article>
+  );
+}
 
 function StoreList({
   stores,
   activeStoreId,
-  userLocation = null,
-  locateError = null,
-  onClearLocateError,
+  userLocation,
   onSelect,
-  showTitle = true,
-  variant = "sidebar",
 }: {
   stores: Store[];
   activeStoreId: number | null;
-  userLocation?: { lat: number; lng: number } | null;
-  locateError?: string | null;
-  onClearLocateError?: () => void;
+  userLocation: { lat: number; lng: number } | null;
   onSelect: (store: Store) => void;
-  showTitle?: boolean;
-  variant?: "sidebar" | "sheet";
 }) {
-  const [query, setQuery] = useState("");
-  const [sortByDistance, setSortByDistance] = useState(true);
-
   const displayStores = useMemo((): (Store | StoreWithDistance)[] => {
-    const filtered = filterStores(stores, query);
-    if (userLocation && sortByDistance) {
-      return sortStoresByDistance(filtered, userLocation);
-    }
-    if (userLocation) {
-      return attachDistances(filtered, userLocation);
-    }
-    return filtered;
-  }, [stores, query, userLocation, sortByDistance]);
+    if (!userLocation) return stores;
+    return sortStoresByDistance(stores, userLocation);
+  }, [stores, userLocation]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="shrink-0 space-y-2 border-b border-gray-200/80 p-3 sm:space-y-3 sm:p-4">
-        {showTitle && (
-          <h2 className="text-base font-bold text-gray-900 sm:text-lg">門市據點</h2>
-        )}
-
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜尋店名、地址、電話..."
-          className="w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-        />
-
-        {userLocation && (
-          <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input
-              type="checkbox"
-              checked={sortByDistance}
-              onChange={(event) => setSortByDistance(event.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            依距離排序
-          </label>
-        )}
-
-        {locateError && (
-          <div
-            role="alert"
-            className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <p>{locateError}</p>
-              {onClearLocateError && (
-                <button
-                  type="button"
-                  onClick={onClearLocateError}
-                  className="shrink-0 text-red-500 hover:text-red-700"
-                  aria-label="關閉提示"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <StoreListScrollArea variant={variant}>
-        {displayStores.length === 0 ? (
-          <p className="p-4 text-sm text-gray-500">找不到符合條件的門市</p>
-        ) : (
-          displayStores.map((store) => (
-            <StoreItem
-              key={store.id}
-              store={store}
-              isActive={store.id === activeStoreId}
-              distanceKm={"distanceKm" in store ? store.distanceKm : undefined}
-              onSelect={onSelect}
-            />
-          ))
-        )}
-      </StoreListScrollArea>
+    <div className="store-list-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      {displayStores.length === 0 ? (
+        <p className="p-6 text-center text-sm text-gray-500">此地區暫無門市</p>
+      ) : (
+        displayStores.map((store) => (
+          <StoreItem
+            key={store.id}
+            store={store}
+            isActive={store.id === activeStoreId}
+            distanceKm={"distanceKm" in store ? store.distanceKm : undefined}
+            onSelect={onSelect}
+          />
+        ))
+      )}
     </div>
   );
 }
 
-// ─── Mobile sheet ────────────────────────────────────────────────────────────
-
-const STORE_DRAWER_COLLAPSED_HEIGHT = "3.25rem";
-
-function StoreListSheet({
-  expanded,
-  onExpandedChange,
-  storeCount,
-  activeStoreName,
-  children,
-}: {
-  expanded: boolean;
-  onExpandedChange: (expanded: boolean) => void;
-  storeCount: number;
-  activeStoreName?: string | null;
-  children: ReactNode;
-}) {
-  const [isEntering, setIsEntering] = useState(false);
-  const wasExpandedRef = useRef(false);
-
-  useEffect(() => {
-    if (expanded && !wasExpandedRef.current) {
-      setIsEntering(true);
-      const timer = window.setTimeout(() => setIsEntering(false), 480);
-      wasExpandedRef.current = true;
-      return () => window.clearTimeout(timer);
-    }
-    if (!expanded) {
-      wasExpandedRef.current = false;
-      setIsEntering(false);
-    }
-  }, [expanded]);
-
-  return (
-    <div
-      className="pointer-events-none fixed inset-x-0 top-0 z-[2000] lg:hidden"
-      style={{
-        ["--store-drawer-collapsed-height" as string]: STORE_DRAWER_COLLAPSED_HEIGHT,
-      }}
-      aria-label="門市列表面板"
-    >
-      <div
-        className={`store-drawer-panel pointer-events-auto mx-auto flex w-full max-w-none flex-col overflow-hidden border border-t-0 border-gray-200/80 bg-white shadow-[0_4px_32px_rgba(15,23,42,0.14)] backdrop-blur-md transition-[height] duration-300 ease-out ${
-          expanded
-            ? "store-drawer-panel--expanded h-[calc(min(58dvh,420px)+env(safe-area-inset-top,0px))] rounded-b-[1.75rem]"
-            : "h-[calc(var(--store-drawer-collapsed-height)+env(safe-area-inset-top,0px))] rounded-b-2xl"
-        } ${isEntering ? "store-drawer-panel--enter" : ""}`}
-        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
-      >
-        <button
-          type="button"
-          onClick={() => onExpandedChange(!expanded)}
-          className="flex min-h-[3.25rem] shrink-0 items-center justify-between gap-3 border-b border-gray-200/80 px-4 py-3 transition-colors hover:bg-gray-50"
-          aria-expanded={expanded}
-          aria-controls="store-list-sheet-content"
-        >
-          <span className="truncate text-left text-sm font-semibold text-gray-900">
-            {expanded ? (activeStoreName ?? "門市據點") : "門市據點"}
-          </span>
-          <span className="flex shrink-0 items-center gap-1.5 text-xs text-gray-500">
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-600">
-              {storeCount} 間
-            </span>
-            <ChevronDown
-              className={`h-4 w-4 shrink-0 text-gray-400 transition-transform duration-300 ${
-                expanded ? "rotate-180" : ""
-              }`}
-              aria-hidden
-            />
-          </span>
-        </button>
-
-        <div
-          id="store-list-sheet-content"
-          className={`flex min-h-0 flex-1 flex-col overflow-hidden touch-pan-y ${
-            expanded
-              ? "store-drawer-content--visible opacity-100"
-              : "pointer-events-none max-h-0 opacity-0"
-          }`}
-        >
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Default layout ──────────────────────────────────────────────────────────
-
-function DefaultStoreLocator({ stores, className }: StoreLocatorProps) {
-  const [sheetExpanded, setSheetExpanded] = useState(false);
+export default function StoreLocator({
+  stores,
+  className,
+  title = "展示中心",
+}: StoreLocatorProps) {
+  const [region, setRegion] = useState<StoreRegion | "all">("all");
   const {
     activeStore,
     focusSource,
@@ -250,84 +150,112 @@ function DefaultStoreLocator({ stores, className }: StoreLocatorProps) {
     handleLocate,
     handleStoreSelect,
     handleMarkerClick,
+    resetSelection,
   } = useStoreLocatorState();
 
-  const handleSelect = useCallback(
-    (store: Store) => {
-      handleStoreSelect(store);
-      setSheetExpanded(false);
-    },
-    [handleStoreSelect],
+  const filteredStores = useMemo(
+    () => filterStoresByRegion(stores, region),
+    [stores, region],
   );
 
-  const handleMarker = useCallback(
-    (store: Store) => {
-      handleMarkerClick(store);
-      setSheetExpanded(false);
-    },
-    [handleMarkerClick],
-  );
+  const mapStores = useMemo(() => {
+    if (!location) return filteredStores;
+    return attachDistances(filteredStores, location);
+  }, [filteredStores, location]);
 
-  const listProps = {
-    stores,
-    activeStoreId: activeStore?.id ?? null,
-    userLocation: location,
-    locateError: error,
-    onClearLocateError: clearError,
-    onSelect: handleSelect,
+  const handleRegionChange = (nextRegion: StoreRegion | "all") => {
+    setRegion(nextRegion);
+    resetSelection();
+  };
+
+  const handleStoreChange = (storeId: number) => {
+    const store = filteredStores.find((item) => item.id === storeId);
+    if (store) handleStoreSelect(store);
   };
 
   return (
     <main
       ref={containerRef}
-      className={`relative h-[100dvh] overflow-hidden lg:flex lg:flex-row${
+      className={`showroom-layout flex h-[100dvh] flex-col overflow-hidden bg-white${
         className ? ` ${className}` : ""
       }`}
     >
-      <aside className="hidden min-h-0 w-[min(100%,380px)] max-w-[35%] shrink-0 flex-col overflow-hidden border border-gray-200/80 bg-white shadow-[4px_0_24px_rgba(15,23,42,0.06)] lg:flex lg:h-full">
-        <StoreList {...listProps} />
-      </aside>
+      <header className="showroom-header shrink-0 border-b border-gray-200 bg-white px-4 py-4 sm:px-6">
+        {title && <h1 className="showroom-header__title">{title}</h1>}
 
-      <section className="absolute inset-0 lg:relative lg:min-h-0 lg:flex-1">
-        <StoreMap
-          stores={stores}
-          activeStore={activeStore}
-          focusSource={focusSource}
-          locateRevision={locateRevision}
-          userLocation={location}
-          isLocating={isLocating}
-          locateError={error}
-          onLocate={handleLocate}
-          onClearLocateError={clearError}
-          isMapFullscreen={isFullscreen}
-          onToggleMapFullscreen={toggleFullscreen}
-          onMarkerClick={handleMarker}
-        />
-      </section>
+        <div className="showroom-header__controls">
+          <div className="showroom-header__filters">
+            <label className="showroom-filter-select">
+              <span className="sr-only">選擇地區</span>
+              <select
+                value={region}
+                onChange={(event) =>
+                  handleRegionChange(event.target.value as StoreRegion | "all")
+                }
+                className="showroom-filter-select__input"
+              >
+                {STORE_REGION_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-      <StoreListSheet
-        expanded={sheetExpanded}
-        onExpandedChange={setSheetExpanded}
-        storeCount={stores.length}
-        activeStoreName={activeStore?.name}
-      >
-        <StoreList {...listProps} showTitle={false} variant="sheet" />
-      </StoreListSheet>
+            <label className="showroom-filter-select showroom-filter-select--store lg:hidden">
+              <span className="sr-only">選擇門市</span>
+              <select
+                value={activeStore?.id ?? ""}
+                onChange={(event) => handleStoreChange(Number(event.target.value))}
+                disabled={filteredStores.length === 0}
+                className="showroom-filter-select__input"
+              >
+                <option value="" disabled>
+                  請選擇門市
+                </option>
+                {filteredStores.map((store) => (
+                  <option key={store.id} value={store.id}>
+                    {store.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <p className="showroom-header__count">
+            為您搜尋到 <strong>{filteredStores.length}</strong> 間
+          </p>
+        </div>
+      </header>
+
+      <div className="showroom-body flex min-h-0 flex-1 flex-col lg:flex-row">
+        <section className="showroom-map relative min-h-0 flex-1 lg:flex-[3]">
+          <StoreMap
+            stores={mapStores}
+            activeStore={activeStore}
+            focusSource={focusSource}
+            locateRevision={locateRevision}
+            userLocation={location}
+            isLocating={isLocating}
+            locateError={error}
+            onLocate={handleLocate}
+            onClearLocateError={clearError}
+            isMapFullscreen={isFullscreen}
+            onToggleMapFullscreen={toggleFullscreen}
+            onMarkerClick={handleMarkerClick}
+            regionViewportKey={region}
+          />
+        </section>
+
+        <aside className="hidden min-h-0 w-[min(100%,420px)] max-w-[38%] shrink-0 flex-col overflow-hidden border-l border-gray-200 bg-white lg:flex">
+          <StoreList
+            stores={filteredStores}
+            activeStoreId={activeStore?.id ?? null}
+            userLocation={location}
+            onSelect={handleStoreSelect}
+          />
+        </aside>
+      </div>
     </main>
   );
-}
-
-// ─── Main export ─────────────────────────────────────────────────────────────
-
-export default function StoreLocator({
-  stores,
-  className,
-  variant = "default",
-  title,
-}: StoreLocatorProps) {
-  if (variant === "showroom") {
-    return <ShowroomLayout stores={stores} className={className} title={title} />;
-  }
-
-  return <DefaultStoreLocator stores={stores} className={className} />;
 }

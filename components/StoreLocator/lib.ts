@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -12,11 +12,8 @@ export interface Store {
   lat: number;
   lng: number;
   placeId?: string;
-  /** Showroom 版型：地區分類 */
   region?: StoreRegion;
-  /** Showroom 版型：門市縮圖 */
   imageUrl?: string;
-  /** Showroom 版型：「了解更多」連結 */
   detailUrl?: string;
 }
 
@@ -49,7 +46,6 @@ export interface RegionViewport {
   zoom: number;
 }
 
-/** 各地區預設地圖視角（無門市資料時的 fallback） */
 export const STORE_REGION_VIEWPORTS: Record<StoreRegion | "all", RegionViewport> = {
   all: { lat: 23.7, lng: 121.0, zoom: 7 },
   taipei: { lat: 25.05, lng: 121.55, zoom: 11 },
@@ -190,15 +186,6 @@ export function sortStoresByDistance(
   );
 }
 
-export function filterStores(stores: Store[], query: string): Store[] {
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) return stores;
-  return stores.filter((store) => {
-    const haystack = `${store.name} ${store.address} ${store.phone}`.toLowerCase();
-    return haystack.includes(normalized);
-  });
-}
-
 export function filterStoresByRegion(
   stores: Store[],
   region: StoreRegion | "all",
@@ -255,7 +242,7 @@ function buildGoogleMapsIosAppUrl(lat: number, lng: number): string {
   return `comgooglemaps://?${params.toString()}`;
 }
 
-function buildGoogleMapsAndroidIntentUrl(lat: number, lng: number, label?: string): string {
+function buildGoogleMapsAndroidIntentUrl(lat: number, lng: number): string {
   const destination = encodeURIComponent(formatCoordinates(lat, lng));
   const webFallback = encodeURIComponent(buildGoogleMapsWebUrl(lat, lng));
   return (
@@ -266,11 +253,7 @@ function buildGoogleMapsAndroidIntentUrl(lat: number, lng: number, label?: strin
   );
 }
 
-export function getNavigationWebFallbackUrl(
-  lat: number,
-  lng: number,
-  _label?: string,
-): string {
+export function getNavigationWebFallbackUrl(lat: number, lng: number): string {
   return buildGoogleMapsWebUrl(lat, lng);
 }
 
@@ -331,16 +314,13 @@ export function navigateToLocation(lat: number, lng: number, label?: string): vo
   }
   if (platform === "ios") {
     openWithAppChain(
-      [
-        buildGoogleMapsIosAppUrl(lat, lng),
-        buildAppleMapsAppUrl(lat, lng, label),
-      ],
+      [buildGoogleMapsIosAppUrl(lat, lng), buildAppleMapsAppUrl(lat, lng, label)],
       buildGoogleMapsWebUrl(lat, lng),
     );
     return;
   }
   openWithAppFallback(
-    buildGoogleMapsAndroidIntentUrl(lat, lng, label),
+    buildGoogleMapsAndroidIntentUrl(lat, lng),
     buildGoogleMapsWebUrl(lat, lng),
   );
 }
@@ -492,4 +472,53 @@ export function useMapFullscreen(targetRef: RefObject<HTMLElement | null>) {
   }, [mode, targetRef]);
 
   return { isFullscreen, toggleFullscreen };
+}
+
+export function useStoreLocatorState() {
+  const [activeStore, setActiveStore] = useState<Store | null>(null);
+  const [focusSource, setFocusSource] = useState<StoreFocusSource>("list");
+  const [locateRevision, setLocateRevision] = useState(0);
+  const containerRef = useRef<HTMLElement>(null);
+  const { isFullscreen, toggleFullscreen } = useMapFullscreen(containerRef);
+  const { location, error, isLocating, locate, clearError } = useGeolocation();
+
+  const handleLocate = useCallback(async () => {
+    setActiveStore(null);
+    setFocusSource("locate");
+    const coords = await locate();
+    if (!coords) return;
+    setLocateRevision((revision) => revision + 1);
+  }, [locate]);
+
+  const handleStoreSelect = useCallback((store: Store) => {
+    setFocusSource("list");
+    setActiveStore(store);
+  }, []);
+
+  const handleMarkerClick = useCallback((store: Store) => {
+    setFocusSource("marker");
+    setActiveStore(store);
+  }, []);
+
+  const resetSelection = useCallback(() => {
+    setActiveStore(null);
+    setFocusSource("list");
+  }, []);
+
+  return {
+    activeStore,
+    focusSource,
+    locateRevision,
+    containerRef,
+    isFullscreen,
+    toggleFullscreen,
+    location,
+    error,
+    isLocating,
+    clearError,
+    handleLocate,
+    handleStoreSelect,
+    handleMarkerClick,
+    resetSelection,
+  };
 }

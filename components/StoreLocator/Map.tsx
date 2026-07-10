@@ -578,7 +578,7 @@ function LocationCard({
       </p>
       <p className={`text-sm leading-snug ${isTech ? "text-slate-300" : "text-gray-600"}`}>{store.phone}</p>
       <a
-        href={getNavigationWebFallbackUrl(store.lat, store.lng, store.name)}
+        href={getNavigationWebFallbackUrl(store.lat, store.lng)}
         className={`store-popup-nav-btn ${
           isTech ? "store-popup-nav-btn--tech" : "store-popup-nav-btn--normal"
         }`}
@@ -830,7 +830,7 @@ export interface StoreMapProps {
   isMapFullscreen?: boolean;
   onToggleMapFullscreen?: () => void;
   onMarkerClick: (store: Store) => void;
-  /** showroom 版型：地區切換時自動調整地圖視角 */
+  /** 地區切換時自動調整地圖視角 */
   regionViewportKey?: StoreRegion | "all";
 }
 
