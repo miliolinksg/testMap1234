@@ -160,12 +160,6 @@ function buildAppleMapsAppUrl(lat: number, lng: number, label?: string): string 
   return `maps://?${params.toString()}`;
 }
 
-function buildAppleMapsWebUrl(lat: number, lng: number, label?: string): string {
-  const params = new URLSearchParams({ daddr: formatCoordinates(lat, lng), dirflg: "d" });
-  if (label) params.set("q", label);
-  return `https://maps.apple.com/?${params.toString()}`;
-}
-
 function buildGoogleMapsWebUrl(lat: number, lng: number): string {
   const params = new URLSearchParams({
     api: "1",
@@ -174,6 +168,14 @@ function buildGoogleMapsWebUrl(lat: number, lng: number): string {
     dir_action: "navigate",
   });
   return `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
+function buildGoogleMapsIosAppUrl(lat: number, lng: number): string {
+  const params = new URLSearchParams({
+    daddr: formatCoordinates(lat, lng),
+    directionsmode: "driving",
+  });
+  return `comgooglemaps://?${params.toString()}`;
 }
 
 function buildGoogleMapsAndroidIntentUrl(lat: number, lng: number, label?: string): string {
@@ -190,11 +192,8 @@ function buildGoogleMapsAndroidIntentUrl(lat: number, lng: number, label?: strin
 export function getNavigationWebFallbackUrl(
   lat: number,
   lng: number,
-  label?: string,
+  _label?: string,
 ): string {
-  if (detectNavigationPlatform() === "ios") {
-    return buildAppleMapsWebUrl(lat, lng, label);
-  }
   return buildGoogleMapsWebUrl(lat, lng);
 }
 
@@ -203,32 +202,48 @@ function openWebUrl(url: string): void {
 }
 
 function openWithAppFallback(appUrl: string, webUrl: string): void {
-  let fallbackTimer: number | undefined;
-  let cancelled = false;
+  openWithAppChain([appUrl], webUrl);
+}
 
-  const cancelFallback = () => {
-    if (cancelled) return;
-    cancelled = true;
-    if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer);
-  };
+function openWithAppChain(appUrls: string[], finalWebUrl: string): void {
+  let index = 0;
 
-  const onVisibilityChange = () => {
-    if (document.hidden) cancelFallback();
-  };
-
-  document.addEventListener("visibilitychange", onVisibilityChange);
-  window.addEventListener("pagehide", cancelFallback, { once: true });
-  window.addEventListener("blur", cancelFallback, { once: true });
-
-  fallbackTimer = window.setTimeout(() => {
-    document.removeEventListener("visibilitychange", onVisibilityChange);
-    if (!cancelled) {
-      cancelled = true;
-      openWebUrl(webUrl);
+  const tryNext = () => {
+    if (index >= appUrls.length) {
+      openWebUrl(finalWebUrl);
+      return;
     }
-  }, APP_FALLBACK_DELAY_MS);
 
-  window.location.assign(appUrl);
+    const appUrl = appUrls[index++];
+    let fallbackTimer: number | undefined;
+    let cancelled = false;
+
+    const cancelFallback = () => {
+      if (cancelled) return;
+      cancelled = true;
+      if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) cancelFallback();
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", cancelFallback, { once: true });
+    window.addEventListener("blur", cancelFallback, { once: true });
+
+    fallbackTimer = window.setTimeout(() => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (!cancelled) {
+        cancelled = true;
+        tryNext();
+      }
+    }, APP_FALLBACK_DELAY_MS);
+
+    window.location.assign(appUrl);
+  };
+
+  tryNext();
 }
 
 export function navigateToLocation(lat: number, lng: number, label?: string): void {
@@ -238,9 +253,12 @@ export function navigateToLocation(lat: number, lng: number, label?: string): vo
     return;
   }
   if (platform === "ios") {
-    openWithAppFallback(
-      buildAppleMapsAppUrl(lat, lng, label),
-      buildAppleMapsWebUrl(lat, lng, label),
+    openWithAppChain(
+      [
+        buildGoogleMapsIosAppUrl(lat, lng),
+        buildAppleMapsAppUrl(lat, lng, label),
+      ],
+      buildGoogleMapsWebUrl(lat, lng),
     );
     return;
   }
