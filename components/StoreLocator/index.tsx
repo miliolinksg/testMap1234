@@ -189,8 +189,8 @@ function StoreListSheet({
       <div
         className={`store-drawer-panel pointer-events-auto mx-auto flex w-full max-w-none flex-col overflow-hidden border border-t-0 border-gray-200/80 bg-white shadow-[0_4px_32px_rgba(15,23,42,0.14)] backdrop-blur-md transition-[height] duration-300 ease-out ${
           expanded
-            ? "store-drawer-panel--expanded h-[min(58dvh,420px)] rounded-b-[1.75rem]"
-            : "h-[var(--store-drawer-collapsed-height)] rounded-b-2xl"
+            ? "store-drawer-panel--expanded h-[calc(min(58dvh,420px)+env(safe-area-inset-top,0px))] rounded-b-[1.75rem]"
+            : "h-[calc(var(--store-drawer-collapsed-height)+env(safe-area-inset-top,0px))] rounded-b-2xl"
         } ${isEntering ? "store-drawer-panel--enter" : ""}`}
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       >

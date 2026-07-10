@@ -297,7 +297,7 @@ function MobileMapStyleSwitcher({
   return (
     <div
       ref={rootRef}
-      className="pointer-events-none absolute inset-0 z-[1000] lg:hidden"
+      className="pointer-events-none absolute inset-0 z-[1100] lg:hidden"
     >
       <div className="pointer-events-auto absolute bottom-[var(--map-style-bottom)] left-3 flex flex-col-reverse items-start gap-2">
         <button
@@ -377,7 +377,7 @@ function DesktopMapStyleSwitcher({
     : "border-slate-200 text-slate-500";
 
   return (
-    <div className="absolute right-4 top-4 z-[1000] hidden w-52 overflow-hidden rounded-lg border shadow-lg backdrop-blur-md lg:block">
+    <div className="absolute right-4 top-4 z-[1100] hidden w-52 overflow-hidden rounded-lg border shadow-lg backdrop-blur-md lg:block">
       <div
         className={`overflow-hidden rounded-lg ${panelClass}`}
       >
@@ -419,6 +419,7 @@ interface MapControlStackProps {
   locateError?: string | null;
   isTech?: boolean;
   isFullscreen?: boolean;
+  pulseFullscreen?: boolean;
   onToggleFullscreen?: () => void;
   onLocate: () => void;
   onClearLocateError?: () => void;
@@ -430,6 +431,7 @@ function MapControlStack({
   locateError = null,
   isTech = false,
   isFullscreen = false,
+  pulseFullscreen = false,
   onToggleFullscreen,
   onLocate,
   onClearLocateError,
@@ -460,7 +462,9 @@ function MapControlStack({
       onClick={handleToggleFullscreen}
       aria-label={isFullscreen ? "離開全螢幕" : "全螢幕"}
       title={isFullscreen ? "離開全螢幕" : "全螢幕"}
-      className={`flex h-11 w-11 items-center justify-center rounded-full border shadow-lg transition-colors ${surfaceClass}`}
+      className={`map-fullscreen-btn flex h-11 w-11 items-center justify-center rounded-full border shadow-lg transition-colors ${surfaceClass}${
+        pulseFullscreen ? " map-fullscreen-btn--pulse" : ""
+      }`}
     >
       {isFullscreen ? (
         <Minimize2 className="h-5 w-5" aria-hidden />
@@ -472,8 +476,8 @@ function MapControlStack({
 
   const rootClass =
     layout === "mobile"
-      ? "map-right-controls pointer-events-none absolute inset-0 z-[1000] lg:hidden"
-      : "map-locate-control pointer-events-none absolute inset-0 z-[1000] hidden lg:block";
+      ? "map-right-controls pointer-events-none absolute inset-0 z-[1100] lg:hidden"
+      : "map-locate-control pointer-events-none absolute inset-0 z-[1100] hidden lg:block";
 
   const innerClass =
     layout === "mobile"
@@ -908,6 +912,15 @@ function RegionViewportController({
   const map = useMap();
 
   useEffect(() => {
+    // 地區不拘：與預設模式相同，台灣中心 zoom 7
+    if (regionKey === "all") {
+      const viewport = STORE_REGION_VIEWPORTS.all;
+      map.setView([viewport.lat, viewport.lng], viewport.zoom, {
+        animate: false,
+      });
+      return;
+    }
+
     if (stores.length === 1) {
       map.setView([stores[0].lat, stores[0].lng], FOCUS_ZOOM, {
         animate: false,
@@ -936,31 +949,49 @@ function RegionViewportController({
   return null;
 }
 
-function shouldRestrictMapTouch(isFullscreen: boolean): boolean {
-  if (isFullscreen) return false;
+/**
+ * 以指標能力判斷，不依視窗寬度。
+ * - 滑鼠 / 觸控板：`(hover: hover) and (pointer: fine)` → 桌面手勢
+ * - 手機 / 平板觸控：其餘 → 單指鎖定、雙指操作
+ * 混合裝置：具備 fine pointer 時預設桌面；實際手指操作另依 touch 事件限制。
+ */
+const DESKTOP_POINTER_MQ = "(hover: hover) and (pointer: fine)";
+
+function hasDesktopPointerCapability(): boolean {
   if (typeof window === "undefined") return false;
-  return !window.matchMedia("(min-width: 1024px) and (hover: hover)").matches;
+  try {
+    return window.matchMedia(DESKTOP_POINTER_MQ).matches;
+  } catch {
+    return !("ontouchstart" in window);
+  }
 }
+
+function subscribeDesktopPointerChange(onChange: () => void): () => void {
+  const mq = window.matchMedia(DESKTOP_POINTER_MQ);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+
+export type MapHintKind = "touch" | "scroll" | null;
 
 function MapTouchInteractionGuard({
   isFullscreen,
   onHintChange,
 }: {
   isFullscreen: boolean;
-  onHintChange: (visible: boolean) => void;
+  onHintChange: (kind: MapHintKind) => void;
 }) {
   const map = useMap();
   const hintTimerRef = useRef<number>();
-  const restrictRef = useRef(false);
   const multiTouchRef = useRef(false);
 
-  const showHint = useCallback(() => {
-    onHintChange(true);
+  const showTouchHint = useCallback(() => {
+    onHintChange("touch");
     window.clearTimeout(hintTimerRef.current);
-    hintTimerRef.current = window.setTimeout(() => onHintChange(false), 2500);
+    hintTimerRef.current = window.setTimeout(() => onHintChange(null), 2500);
   }, [onHintChange]);
 
-  /** 桌面 / 全螢幕：完整操作。限制模式：單指鎖住，雙指縮放常開。 */
+  /** 觸控限制：單指鎖住，雙指縮放常開；滾輪關閉。 */
   const applyRestrictedHandlers = useCallback(() => {
     map.dragging.disable();
     map.touchZoom.enable();
@@ -970,7 +1001,8 @@ function MapTouchInteractionGuard({
     map.scrollWheelZoom.disable();
   }, [map]);
 
-  const applyUnlockedHandlers = useCallback(() => {
+  /** 全螢幕：完整操作（含滾輪縮放）。 */
+  const applyFullscreenHandlers = useCallback(() => {
     map.dragging.enable();
     map.touchZoom.enable();
     map.doubleClickZoom.enable();
@@ -979,97 +1011,263 @@ function MapTouchInteractionGuard({
     map.scrollWheelZoom.enable();
   }, [map]);
 
-  useEffect(() => {
+  /** 桌面指標：可拖曳，滾輪需 Ctrl（由 MapDesktopScrollGuard 處理）。 */
+  const applyDesktopHandlers = useCallback(() => {
+    map.dragging.enable();
+    map.touchZoom.enable();
+    map.doubleClickZoom.enable();
+    map.boxZoom.enable();
+    map.keyboard.enable();
+    map.scrollWheelZoom.disable();
+  }, [map]);
+
+  const applyModeForPointer = useCallback(() => {
     const container = map.getContainer();
+    multiTouchRef.current = false;
 
-    const applyMode = () => {
-      const restricted = shouldRestrictMapTouch(isFullscreen);
-      restrictRef.current = restricted;
-      multiTouchRef.current = false;
-
-      if (!restricted) {
-        container.classList.remove("leaflet-touch-restricted");
-        applyUnlockedHandlers();
-        onHintChange(false);
-        return;
-      }
-
-      container.classList.add("leaflet-touch-restricted");
-      applyRestrictedHandlers();
-    };
-
-    applyMode();
-
-    const desktopMq = window.matchMedia("(min-width: 1024px) and (hover: hover)");
-    desktopMq.addEventListener("change", applyMode);
-    return () => {
-      desktopMq.removeEventListener("change", applyMode);
+    if (isFullscreen) {
       container.classList.remove("leaflet-touch-restricted");
+      applyFullscreenHandlers();
+      onHintChange(null);
+      return;
+    }
+
+    if (hasDesktopPointerCapability()) {
+      container.classList.remove("leaflet-touch-restricted");
+      applyDesktopHandlers();
+      onHintChange(null);
+      return;
+    }
+
+    container.classList.add("leaflet-touch-restricted");
+    applyRestrictedHandlers();
+  }, [
+    map,
+    isFullscreen,
+    onHintChange,
+    applyFullscreenHandlers,
+    applyDesktopHandlers,
+    applyRestrictedHandlers,
+  ]);
+
+  useEffect(() => {
+    applyModeForPointer();
+    return subscribeDesktopPointerChange(applyModeForPointer);
+  }, [applyModeForPointer]);
+
+  useEffect(() => {
+    return () => {
+      map.getContainer().classList.remove("leaflet-touch-restricted");
       window.clearTimeout(hintTimerRef.current);
     };
-  }, [isFullscreen, onHintChange, applyRestrictedHandlers, applyUnlockedHandlers, map]);
+  }, [map]);
 
   useEffect(() => {
     const container = map.getContainer();
 
     const onTouchStart = (event: TouchEvent) => {
-      if (!restrictRef.current) return;
+      if (isFullscreen) return;
 
+      // 純觸控，或混合裝置上的手指：都走雙指規則
       if (event.touches.length >= 2) {
         multiTouchRef.current = true;
-        onHintChange(false);
-        // 雙指：暫時開啟拖曳，讓平移與 pinch 都作用在地圖上
+        onHintChange(null);
         map.dragging.enable();
         map.touchZoom.enable();
+        container.classList.add("leaflet-touch-restricted");
         return;
       }
 
       if (event.touches.length === 1) {
         multiTouchRef.current = false;
-        showHint();
+        map.dragging.disable();
+        map.scrollWheelZoom.disable();
+        container.classList.add("leaflet-touch-restricted");
+        showTouchHint();
       }
     };
 
     const onTouchMove = (event: TouchEvent) => {
-      if (!restrictRef.current) return;
+      if (isFullscreen) return;
 
       if (event.touches.length >= 2) {
-        // 阻止瀏覽器整頁 pinch-zoom，改由 Leaflet 處理地圖縮放
         event.preventDefault();
         multiTouchRef.current = true;
         return;
       }
 
       if (event.touches.length === 1 && !multiTouchRef.current) {
-        showHint();
+        showTouchHint();
       }
     };
 
     const onTouchEnd = (event: TouchEvent) => {
-      if (!restrictRef.current) return;
+      if (isFullscreen) return;
+      if (event.touches.length >= 2) return;
 
-      if (event.touches.length < 2) {
-        multiTouchRef.current = false;
-        // 回到限制模式：單指不可拖，雙指縮放仍可用
+      multiTouchRef.current = false;
+
+      // 手指離開後：有桌面指標則恢復滑鼠可拖；否則維持觸控限制
+      if (hasDesktopPointerCapability()) {
+        applyDesktopHandlers();
+        container.classList.remove("leaflet-touch-restricted");
+      } else {
         applyRestrictedHandlers();
+        container.classList.add("leaflet-touch-restricted");
       }
     };
 
+    // 混合裝置：滑鼠／筆按下時恢復桌面拖曳
+    const onPointerDown = (event: PointerEvent) => {
+      if (isFullscreen) return;
+      if (event.pointerType !== "mouse" && event.pointerType !== "pen") return;
+      if (!hasDesktopPointerCapability()) return;
+      if (multiTouchRef.current) return;
+
+      applyDesktopHandlers();
+      container.classList.remove("leaflet-touch-restricted");
+    };
+
     container.addEventListener("touchstart", onTouchStart, { passive: true });
-    // passive: false 才能 preventDefault，擋住整頁縮放
     container.addEventListener("touchmove", onTouchMove, { passive: false });
     container.addEventListener("touchend", onTouchEnd, { passive: true });
     container.addEventListener("touchcancel", onTouchEnd, { passive: true });
+    container.addEventListener("pointerdown", onPointerDown);
 
     return () => {
       container.removeEventListener("touchstart", onTouchStart);
       container.removeEventListener("touchmove", onTouchMove);
       container.removeEventListener("touchend", onTouchEnd);
       container.removeEventListener("touchcancel", onTouchEnd);
+      container.removeEventListener("pointerdown", onPointerDown);
     };
-  }, [map, onHintChange, showHint, applyRestrictedHandlers]);
+  }, [
+    map,
+    isFullscreen,
+    onHintChange,
+    showTouchHint,
+    applyRestrictedHandlers,
+    applyDesktopHandlers,
+  ]);
 
   return null;
+}
+
+function MapDesktopScrollGuard({
+  isFullscreen,
+  onHintChange,
+}: {
+  isFullscreen: boolean;
+  onHintChange: (kind: MapHintKind) => void;
+}) {
+  const map = useMap();
+  const hintTimerRef = useRef<number>();
+  const desktopPointerRef = useRef(hasDesktopPointerCapability());
+
+  const showScrollHint = useCallback(() => {
+    onHintChange("scroll");
+    window.clearTimeout(hintTimerRef.current);
+    hintTimerRef.current = window.setTimeout(() => onHintChange(null), 2500);
+  }, [onHintChange]);
+
+  useEffect(() => {
+    const syncPointerCapability = () => {
+      desktopPointerRef.current = hasDesktopPointerCapability();
+    };
+    syncPointerCapability();
+    return subscribeDesktopPointerChange(syncPointerCapability);
+  }, []);
+
+  useEffect(() => {
+    const container = map.getContainer();
+
+    const isDesktopScrollMode = () =>
+      !isFullscreen && desktopPointerRef.current;
+
+    const disableDesktopWheelZoom = () => {
+      if (isDesktopScrollMode()) {
+        map.scrollWheelZoom.disable();
+      }
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isDesktopScrollMode()) return;
+      if (event.key === "Control" || event.key === "Meta") {
+        map.scrollWheelZoom.enable();
+      }
+    };
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Control" || event.key === "Meta") {
+        disableDesktopWheelZoom();
+      }
+    };
+
+    const onWindowBlur = () => {
+      disableDesktopWheelZoom();
+    };
+
+    const onWheel = (event: WheelEvent) => {
+      if (!isDesktopScrollMode()) return;
+
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        onHintChange(null);
+
+        const alreadyEnabled = map.scrollWheelZoom.enabled();
+        map.scrollWheelZoom.enable();
+
+        if (!alreadyEnabled) {
+          const pxPerZoom = map.options.wheelPxPerZoomLevel || 60;
+          map.setZoom(map.getZoom() - event.deltaY / pxPerZoom, {
+            animate: false,
+          });
+        }
+        return;
+      }
+
+      event.preventDefault();
+      map.scrollWheelZoom.disable();
+      showScrollHint();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onWindowBlur);
+    container.addEventListener("wheel", onWheel, { passive: false, capture: true });
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onWindowBlur);
+      container.removeEventListener("wheel", onWheel, true);
+      window.clearTimeout(hintTimerRef.current);
+    };
+  }, [map, isFullscreen, onHintChange, showScrollHint]);
+
+  return null;
+}
+
+function MapHintOverlay({ kind }: { kind: MapHintKind }) {
+  if (!kind) return null;
+
+  return (
+    <div className="map-touch-hint" role="status" aria-live="polite">
+      {kind === "touch" ? (
+        <>
+          <p className="map-touch-hint__title">同時以兩指移動地圖</p>
+          <p className="map-touch-hint__sub">或點擊右下角全螢幕按鈕操作地圖</p>
+        </>
+      ) : (
+        <>
+          <p className="map-touch-hint__title">
+            按著鍵盤上的 Ctrl 按鍵加上滾動滑鼠可以縮放地圖
+          </p>
+          <p className="map-touch-hint__sub">或點擊右下角全螢幕按鈕後直接以滾輪縮放</p>
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function StoreMap({
@@ -1088,10 +1286,11 @@ export default function StoreMap({
   regionViewportKey,
 }: StoreMapProps) {
   const [mapStyle, setMapStyle] = useState<MapStyleKey>("emap6");
-  const [touchHintVisible, setTouchHintVisible] = useState(false);
+  const [mapHint, setMapHint] = useState<MapHintKind>(null);
   const markerRefs = useRef<Record<number, L.Marker>>({});
   const currentStyle = mapStyles[mapStyle];
   const isTech = currentStyle.uiVariant === "tech";
+  const pulseFullscreen = mapHint !== null;
 
   return (
     <div
@@ -1099,17 +1298,13 @@ export default function StoreMap({
         isTech ? "bg-slate-950" : "bg-gray-100"
       }`}
     >
-      {touchHintVisible && (
-        <div className="map-touch-hint" role="status" aria-live="polite">
-          <p className="map-touch-hint__title">同時以兩指移動地圖</p>
-          <p className="map-touch-hint__sub">或點擊右下角全螢幕按鈕操作地圖</p>
-        </div>
-      )}
-
       <MapContainer
         center={TAIWAN_CENTER}
         zoom={DEFAULT_ZOOM}
         scrollWheelZoom={false}
+        zoomSnap={0}
+        zoomDelta={1}
+        wheelPxPerZoomLevel={120}
         zoomControl={false}
         className="h-full w-full z-0"
       >
@@ -1160,8 +1355,15 @@ export default function StoreMap({
 
         <MapTouchInteractionGuard
           isFullscreen={isMapFullscreen}
-          onHintChange={setTouchHintVisible}
+          onHintChange={setMapHint}
         />
+
+        <MapDesktopScrollGuard
+          isFullscreen={isMapFullscreen}
+          onHintChange={setMapHint}
+        />
+
+        <MapHintOverlay kind={mapHint} />
 
         <MapControlStack
           layout="mobile"
@@ -1169,6 +1371,7 @@ export default function StoreMap({
           locateError={locateError}
           isTech={isTech}
           isFullscreen={isMapFullscreen}
+          pulseFullscreen={pulseFullscreen}
           onToggleFullscreen={onToggleMapFullscreen}
           onLocate={onLocate}
           onClearLocateError={onClearLocateError}
@@ -1180,6 +1383,7 @@ export default function StoreMap({
           locateError={locateError}
           isTech={isTech}
           isFullscreen={isMapFullscreen}
+          pulseFullscreen={pulseFullscreen}
           onToggleFullscreen={onToggleMapFullscreen}
           onLocate={onLocate}
           onClearLocateError={onClearLocateError}

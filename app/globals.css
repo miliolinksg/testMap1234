@@ -666,6 +666,29 @@ body.map-fullscreen-active {
   }
 }
 
+/* 警語出現時：全螢幕按鈕閃爍引導 */
+.map-fullscreen-btn--pulse {
+  animation: map-fullscreen-btn-pulse 1s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes map-fullscreen-btn-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 4px 14px rgba(15, 23, 42, 0.18),
+      0 0 0 0 rgba(37, 99, 235, 0.55);
+  }
+
+  50% {
+    transform: scale(1.08);
+    box-shadow:
+      0 6px 18px rgba(15, 23, 42, 0.22),
+      0 0 0 10px rgba(37, 99, 235, 0);
+  }
+}
+
 /* 圖資來源：右下角貼底 */
 .leaflet-container .leaflet-bottom.leaflet-right {
   top: auto;
