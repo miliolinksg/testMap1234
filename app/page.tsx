@@ -1,8 +1,23 @@
 "use client";
 
-import StoreLocator from "@/components/StoreLocator";
+import { useState } from "react";
+import StoreLocator, { type StoreLocatorVariant } from "@/components/StoreLocator";
+import { VariantSwitcher } from "@/components/StoreLocator/VariantSwitcher";
 import { stores } from "@/data/stores";
+import { showroomStores } from "@/data/showroom-stores";
 
 export default function HomePage() {
-  return <StoreLocator stores={stores} />;
+  const [variant, setVariant] = useState<StoreLocatorVariant>("default");
+
+  return (
+    <>
+      <VariantSwitcher value={variant} onChange={setVariant} />
+      <StoreLocator
+        key={variant}
+        stores={variant === "showroom" ? showroomStores : stores}
+        variant={variant}
+        title="展示中心"
+      />
+    </>
+  );
 }

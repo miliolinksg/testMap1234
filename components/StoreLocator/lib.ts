@@ -12,6 +12,75 @@ export interface Store {
   lat: number;
   lng: number;
   placeId?: string;
+  /** Showroom 版型：地區分類 */
+  region?: StoreRegion;
+  /** Showroom 版型：門市縮圖 */
+  imageUrl?: string;
+  /** Showroom 版型：「了解更多」連結 */
+  detailUrl?: string;
+}
+
+export type StoreRegion =
+  | "taipei"
+  | "taoyuan-hsinchu-miaoli"
+  | "central"
+  | "south-central"
+  | "kaohsiung-pingtung"
+  | "yilan-hualien";
+
+export interface StoreRegionOption {
+  value: StoreRegion | "all";
+  label: string;
+}
+
+export const STORE_REGION_OPTIONS: StoreRegionOption[] = [
+  { value: "all", label: "地區不拘" },
+  { value: "taipei", label: "大台北地區" },
+  { value: "taoyuan-hsinchu-miaoli", label: "桃竹苗地區" },
+  { value: "central", label: "中彰投地區" },
+  { value: "south-central", label: "雲嘉南地區" },
+  { value: "kaohsiung-pingtung", label: "高屏地區" },
+  { value: "yilan-hualien", label: "宜蘭花蓮地區" },
+];
+
+export interface RegionViewport {
+  lat: number;
+  lng: number;
+  zoom: number;
+}
+
+/** 各地區預設地圖視角（無門市資料時的 fallback） */
+export const STORE_REGION_VIEWPORTS: Record<StoreRegion | "all", RegionViewport> = {
+  all: { lat: 23.7, lng: 121.0, zoom: 7 },
+  taipei: { lat: 25.05, lng: 121.55, zoom: 11 },
+  "taoyuan-hsinchu-miaoli": { lat: 24.8, lng: 121.0, zoom: 9 },
+  central: { lat: 24.15, lng: 120.65, zoom: 10 },
+  "south-central": { lat: 23.3, lng: 120.25, zoom: 10 },
+  "kaohsiung-pingtung": { lat: 22.75, lng: 120.35, zoom: 10 },
+  "yilan-hualien": { lat: 24.2, lng: 121.6, zoom: 9 },
+};
+
+export type StoreBounds = [[number, number], [number, number]];
+
+export function getStoresBounds(stores: Store[]): StoreBounds | null {
+  if (stores.length === 0) return null;
+
+  let minLat = stores[0].lat;
+  let maxLat = stores[0].lat;
+  let minLng = stores[0].lng;
+  let maxLng = stores[0].lng;
+
+  for (const store of stores) {
+    minLat = Math.min(minLat, store.lat);
+    maxLat = Math.max(maxLat, store.lat);
+    minLng = Math.min(minLng, store.lng);
+    maxLng = Math.max(maxLng, store.lng);
+  }
+
+  return [
+    [minLat, minLng],
+    [maxLat, maxLng],
+  ];
 }
 
 export interface Coordinates {
@@ -128,6 +197,14 @@ export function filterStores(stores: Store[], query: string): Store[] {
     const haystack = `${store.name} ${store.address} ${store.phone}`.toLowerCase();
     return haystack.includes(normalized);
   });
+}
+
+export function filterStoresByRegion(
+  stores: Store[],
+  region: StoreRegion | "all",
+): Store[] {
+  if (region === "all") return stores;
+  return stores.filter((store) => store.region === region);
 }
 
 export function createPhoneUrl(phone: string): string {

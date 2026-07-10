@@ -18,6 +18,7 @@ import {
   type Store,
   type Coordinates,
   type StoreFocusSource,
+  type StoreRegion,
   type MapStyleKey,
   type MapUiVariant,
   mapStyles,
@@ -25,6 +26,8 @@ import {
   buildNlscWmtsUrl,
   getNavigationWebFallbackUrl,
   navigateToLocation,
+  getStoresBounds,
+  STORE_REGION_VIEWPORTS,
 } from "./lib";
 
 // ─── Marker animation ────────────────────────────────────────────────────────
@@ -821,6 +824,8 @@ export interface StoreMapProps {
   isMapFullscreen?: boolean;
   onToggleMapFullscreen?: () => void;
   onMarkerClick: (store: Store) => void;
+  /** showroom 版型：地區切換時自動調整地圖視角 */
+  regionViewportKey?: StoreRegion | "all";
 }
 
 interface MapControllerProps {
@@ -891,6 +896,44 @@ function MapController({
   return null;
 }
 
+function RegionViewportController({
+  stores,
+  regionKey,
+}: {
+  stores: Store[];
+  regionKey: StoreRegion | "all";
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (stores.length === 1) {
+      map.setView([stores[0].lat, stores[0].lng], FOCUS_ZOOM, {
+        animate: false,
+      });
+      return;
+    }
+
+    const bounds = getStoresBounds(stores);
+    if (bounds) {
+      map.fitBounds(bounds, {
+        padding: [48, 48],
+        maxZoom: 12,
+        animate: false,
+      });
+      return;
+    }
+
+    const viewport = STORE_REGION_VIEWPORTS[regionKey];
+    map.setView([viewport.lat, viewport.lng], viewport.zoom, {
+      animate: false,
+    });
+    // 僅在地區切換時調整視角；stores 取自同次 render 的篩選結果
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- regionKey
+  }, [regionKey, map]);
+
+  return null;
+}
+
 export default function StoreMap({
   stores,
   activeStore,
@@ -904,6 +947,7 @@ export default function StoreMap({
   isMapFullscreen = false,
   onToggleMapFullscreen,
   onMarkerClick,
+  regionViewportKey,
 }: StoreMapProps) {
   const [mapStyle, setMapStyle] = useState<MapStyleKey>("emap6");
   const markerRefs = useRef<Record<number, L.Marker>>({});
@@ -960,6 +1004,13 @@ export default function StoreMap({
           focusSource={focusSource}
           markerRefs={markerRefs}
         />
+
+        {regionViewportKey !== undefined && (
+          <RegionViewportController
+            stores={stores}
+            regionKey={regionViewportKey}
+          />
+        )}
 
         <MapControlStack
           layout="mobile"

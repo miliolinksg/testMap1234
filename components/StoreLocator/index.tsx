@@ -8,194 +8,38 @@ import {
   useMemo,
   useRef,
   useState,
-  type MouseEvent,
   type ReactNode,
 } from "react";
+import { StoreListScrollArea } from "./StoreListScrollArea";
+import { StoreItem } from "./StoreItem";
+import ShowroomLayout from "./ShowroomLayout";
 import {
   type Store,
-  type StoreFocusSource,
   type StoreWithDistance,
   attachDistances,
-  createPhoneUrl,
   filterStores,
-  formatDistance,
-  getNavigationWebFallbackUrl,
-  navigateToLocation,
   sortStoresByDistance,
-  useGeolocation,
-  useMapFullscreen,
 } from "./lib";
+import { useStoreLocatorState } from "./useStoreLocatorState";
 
 const StoreMap = dynamic(() => import("./Map"), { ssr: false });
 
-export type { Store, StoreFocusSource } from "./lib";
+export type { Store, StoreFocusSource, StoreRegion } from "./lib";
 export type { StoreMapProps } from "./Map";
+export { STORE_REGION_OPTIONS } from "./lib";
+export { default as StoreLocatorShowroom } from "./ShowroomLayout";
+export type { ShowroomLayoutProps as StoreLocatorShowroomProps } from "./ShowroomLayout";
+export { VariantSwitcher } from "./VariantSwitcher";
+
+export type StoreLocatorVariant = "default" | "showroom";
 
 export interface StoreLocatorProps {
   stores: Store[];
   className?: string;
-}
-
-// ─── Navigate link ─────────────────────────────────────────────────────────────
-
-function NavigateLink({
-  lat,
-  lng,
-  label,
-  className,
-  children = "開始導航",
-  onBeforeNavigate,
-}: {
-  lat: number;
-  lng: number;
-  label?: string;
-  className?: string;
-  children?: ReactNode;
-  onBeforeNavigate?: (event: MouseEvent<HTMLAnchorElement>) => void;
-}) {
-  return (
-    <a
-      href={getNavigationWebFallbackUrl(lat, lng, label)}
-      className={className}
-      onClick={(event) => {
-        event.preventDefault();
-        onBeforeNavigate?.(event);
-        navigateToLocation(lat, lng, label);
-      }}
-    >
-      {children}
-    </a>
-  );
-}
-
-// ─── Store list scroll area ────────────────────────────────────────────────────
-
-function StoreListScrollArea({
-  children,
-  variant = "sidebar",
-}: {
-  children: ReactNode;
-  variant?: "sidebar" | "sheet";
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [metrics, setMetrics] = useState({
-    scrollable: false,
-    thumbTop: 0,
-    thumbHeight: 0,
-  });
-
-  const updateMetrics = useCallback(() => {
-    const element = scrollRef.current;
-    if (!element) return;
-
-    const scrollable = element.scrollHeight > element.clientHeight + 2;
-    const viewport = element.clientHeight;
-    const content = element.scrollHeight;
-    const thumbHeight = scrollable
-      ? Math.max((viewport / content) * viewport, 28)
-      : 0;
-    const maxThumbTop = viewport - thumbHeight;
-    const scrollRatio =
-      content <= viewport ? 0 : element.scrollTop / (content - viewport);
-    const thumbTop = scrollable ? scrollRatio * maxThumbTop : 0;
-
-    setMetrics({ scrollable, thumbTop, thumbHeight });
-  }, []);
-
-  useEffect(() => {
-    const element = scrollRef.current;
-    if (!element) return;
-
-    updateMetrics();
-    const observer = new ResizeObserver(updateMetrics);
-    observer.observe(element);
-    if (element.firstElementChild) observer.observe(element.firstElementChild);
-    return () => observer.disconnect();
-  }, [children, updateMetrics]);
-
-  return (
-    <div className="relative min-h-0 flex-1">
-      <div
-        ref={scrollRef}
-        onScroll={updateMetrics}
-        className={`store-list-scroll h-full overscroll-contain ${
-          metrics.scrollable ? "store-list-scroll--active is-scrollable" : ""
-        } ${variant === "sheet" ? "store-list-scroll--sheet" : ""}`}
-      >
-        {children}
-      </div>
-
-      {metrics.scrollable && (
-        <div className="store-list-scrollbar" aria-hidden>
-          <div className="store-list-scrollbar-track">
-            <div
-              className="store-list-scrollbar-thumb"
-              style={{
-                height: `${metrics.thumbHeight}px`,
-                transform: `translateY(${metrics.thumbTop}px)`,
-              }}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Store item ──────────────────────────────────────────────────────────────
-
-function StoreItem({
-  store,
-  isActive,
-  distanceKm,
-  onSelect,
-}: {
-  store: Store;
-  isActive: boolean;
-  distanceKm?: number;
-  onSelect: (store: Store) => void;
-}) {
-  return (
-    <div
-      className={`border-b border-gray-200 p-3 sm:p-4 ${
-        isActive ? "bg-blue-50" : "bg-white"
-      }`}
-    >
-      <button
-        type="button"
-        onClick={() => onSelect(store)}
-        className="w-full text-left hover:opacity-90"
-      >
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="font-semibold text-gray-900">{store.name}</h3>
-          {distanceKm !== undefined && (
-            <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-              {formatDistance(distanceKm)}
-            </span>
-          )}
-        </div>
-        <p className="mt-1 text-sm text-gray-600">{store.address}</p>
-        <p className="mt-1 text-sm text-gray-600">{store.phone}</p>
-      </button>
-
-      <div className="mt-2 flex flex-col gap-2 sm:mt-3 sm:flex-row sm:flex-wrap">
-        <NavigateLink
-          lat={store.lat}
-          lng={store.lng}
-          label={store.name}
-          onBeforeNavigate={(event) => event.stopPropagation()}
-          className="inline-flex items-center justify-center rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 sm:justify-start sm:py-1.5"
-        />
-        <a
-          href={createPhoneUrl(store.phone)}
-          onClick={(event) => event.stopPropagation()}
-          className="inline-flex items-center justify-center rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:justify-start sm:py-1.5"
-        >
-          撥打電話
-        </a>
-      </div>
-    </div>
-  );
+  /** default：左側列表 + 全螢幕地圖；showroom：頂部篩選 + 左地圖右列表 */
+  variant?: StoreLocatorVariant;
+  /** showroom 版型標題 */
+  title?: string;
 }
 
 // ─── Store list ──────────────────────────────────────────────────────────────
@@ -388,30 +232,41 @@ function StoreListSheet({
   );
 }
 
-// ─── Main export ─────────────────────────────────────────────────────────────
+// ─── Default layout ──────────────────────────────────────────────────────────
 
-export default function StoreLocator({ stores, className }: StoreLocatorProps) {
-  const [activeStore, setActiveStore] = useState<Store | null>(null);
-  const [focusSource, setFocusSource] = useState<StoreFocusSource>("list");
-  const [locateRevision, setLocateRevision] = useState(0);
+function DefaultStoreLocator({ stores, className }: StoreLocatorProps) {
   const [sheetExpanded, setSheetExpanded] = useState(false);
-  const containerRef = useRef<HTMLElement>(null);
-  const { isFullscreen, toggleFullscreen } = useMapFullscreen(containerRef);
-  const { location, error, isLocating, locate, clearError } = useGeolocation();
+  const {
+    activeStore,
+    focusSource,
+    locateRevision,
+    containerRef,
+    isFullscreen,
+    toggleFullscreen,
+    location,
+    error,
+    isLocating,
+    clearError,
+    handleLocate,
+    handleStoreSelect,
+    handleMarkerClick,
+  } = useStoreLocatorState();
 
-  const handleLocate = useCallback(async () => {
-    setActiveStore(null);
-    setFocusSource("locate");
-    const coords = await locate();
-    if (!coords) return;
-    setLocateRevision((revision) => revision + 1);
-  }, [locate]);
+  const handleSelect = useCallback(
+    (store: Store) => {
+      handleStoreSelect(store);
+      setSheetExpanded(false);
+    },
+    [handleStoreSelect],
+  );
 
-  const handleStoreSelect = useCallback((store: Store) => {
-    setFocusSource("list");
-    setActiveStore(store);
-    setSheetExpanded(false);
-  }, []);
+  const handleMarker = useCallback(
+    (store: Store) => {
+      handleMarkerClick(store);
+      setSheetExpanded(false);
+    },
+    [handleMarkerClick],
+  );
 
   const listProps = {
     stores,
@@ -419,7 +274,7 @@ export default function StoreLocator({ stores, className }: StoreLocatorProps) {
     userLocation: location,
     locateError: error,
     onClearLocateError: clearError,
-    onSelect: handleStoreSelect,
+    onSelect: handleSelect,
   };
 
   return (
@@ -446,11 +301,7 @@ export default function StoreLocator({ stores, className }: StoreLocatorProps) {
           onClearLocateError={clearError}
           isMapFullscreen={isFullscreen}
           onToggleMapFullscreen={toggleFullscreen}
-          onMarkerClick={(store) => {
-            setFocusSource("marker");
-            setActiveStore(store);
-            setSheetExpanded(false);
-          }}
+          onMarkerClick={handleMarker}
         />
       </section>
 
@@ -464,4 +315,19 @@ export default function StoreLocator({ stores, className }: StoreLocatorProps) {
       </StoreListSheet>
     </main>
   );
+}
+
+// ─── Main export ─────────────────────────────────────────────────────────────
+
+export default function StoreLocator({
+  stores,
+  className,
+  variant = "default",
+  title,
+}: StoreLocatorProps) {
+  if (variant === "showroom") {
+    return <ShowroomLayout stores={stores} className={className} title={title} />;
+  }
+
+  return <DefaultStoreLocator stores={stores} className={className} />;
 }
