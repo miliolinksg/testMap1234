@@ -952,6 +952,7 @@ function MapTouchInteractionGuard({
   const map = useMap();
   const hintTimerRef = useRef<number>();
   const restrictRef = useRef(false);
+  const multiTouchRef = useRef(false);
 
   const showHint = useCallback(() => {
     onHintChange(true);
@@ -959,38 +960,42 @@ function MapTouchInteractionGuard({
     hintTimerRef.current = window.setTimeout(() => onHintChange(false), 2500);
   }, [onHintChange]);
 
-  const setMapInteraction = useCallback(
-    (enabled: boolean) => {
-      if (enabled) {
-        map.dragging.enable();
-        map.touchZoom.enable();
-        map.doubleClickZoom.enable();
-        map.boxZoom.enable();
-        map.scrollWheelZoom.enable();
-        return;
-      }
+  /** 桌面 / 全螢幕：完整操作。限制模式：單指鎖住，雙指縮放常開。 */
+  const applyRestrictedHandlers = useCallback(() => {
+    map.dragging.disable();
+    map.touchZoom.enable();
+    map.doubleClickZoom.disable();
+    map.boxZoom.disable();
+    map.keyboard.disable();
+    map.scrollWheelZoom.disable();
+  }, [map]);
 
-      map.dragging.disable();
-      map.touchZoom.disable();
-      map.doubleClickZoom.disable();
-      map.boxZoom.disable();
-      map.scrollWheelZoom.disable();
-    },
-    [map],
-  );
+  const applyUnlockedHandlers = useCallback(() => {
+    map.dragging.enable();
+    map.touchZoom.enable();
+    map.doubleClickZoom.enable();
+    map.boxZoom.enable();
+    map.keyboard.enable();
+    map.scrollWheelZoom.enable();
+  }, [map]);
 
   useEffect(() => {
+    const container = map.getContainer();
+
     const applyMode = () => {
       const restricted = shouldRestrictMapTouch(isFullscreen);
       restrictRef.current = restricted;
+      multiTouchRef.current = false;
 
       if (!restricted) {
-        setMapInteraction(true);
+        container.classList.remove("leaflet-touch-restricted");
+        applyUnlockedHandlers();
         onHintChange(false);
         return;
       }
 
-      setMapInteraction(false);
+      container.classList.add("leaflet-touch-restricted");
+      applyRestrictedHandlers();
     };
 
     applyMode();
@@ -999,9 +1004,10 @@ function MapTouchInteractionGuard({
     desktopMq.addEventListener("change", applyMode);
     return () => {
       desktopMq.removeEventListener("change", applyMode);
+      container.classList.remove("leaflet-touch-restricted");
       window.clearTimeout(hintTimerRef.current);
     };
-  }, [isFullscreen, onHintChange, setMapInteraction]);
+  }, [isFullscreen, onHintChange, applyRestrictedHandlers, applyUnlockedHandlers, map]);
 
   useEffect(() => {
     const container = map.getContainer();
@@ -1009,29 +1015,49 @@ function MapTouchInteractionGuard({
     const onTouchStart = (event: TouchEvent) => {
       if (!restrictRef.current) return;
 
-      if (event.touches.length === 1) {
-        showHint();
+      if (event.touches.length >= 2) {
+        multiTouchRef.current = true;
+        onHintChange(false);
+        // 雙指：暫時開啟拖曳，讓平移與 pinch 都作用在地圖上
+        map.dragging.enable();
+        map.touchZoom.enable();
         return;
       }
 
-      if (event.touches.length >= 2) {
-        onHintChange(false);
-        setMapInteraction(true);
+      if (event.touches.length === 1) {
+        multiTouchRef.current = false;
+        showHint();
       }
     };
 
     const onTouchMove = (event: TouchEvent) => {
       if (!restrictRef.current) return;
-      if (event.touches.length === 1) showHint();
+
+      if (event.touches.length >= 2) {
+        // 阻止瀏覽器整頁 pinch-zoom，改由 Leaflet 處理地圖縮放
+        event.preventDefault();
+        multiTouchRef.current = true;
+        return;
+      }
+
+      if (event.touches.length === 1 && !multiTouchRef.current) {
+        showHint();
+      }
     };
 
     const onTouchEnd = (event: TouchEvent) => {
       if (!restrictRef.current) return;
-      if (event.touches.length < 2) setMapInteraction(false);
+
+      if (event.touches.length < 2) {
+        multiTouchRef.current = false;
+        // 回到限制模式：單指不可拖，雙指縮放仍可用
+        applyRestrictedHandlers();
+      }
     };
 
     container.addEventListener("touchstart", onTouchStart, { passive: true });
-    container.addEventListener("touchmove", onTouchMove, { passive: true });
+    // passive: false 才能 preventDefault，擋住整頁縮放
+    container.addEventListener("touchmove", onTouchMove, { passive: false });
     container.addEventListener("touchend", onTouchEnd, { passive: true });
     container.addEventListener("touchcancel", onTouchEnd, { passive: true });
 
@@ -1041,7 +1067,7 @@ function MapTouchInteractionGuard({
       container.removeEventListener("touchend", onTouchEnd);
       container.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [map, onHintChange, setMapInteraction, showHint]);
+  }, [map, onHintChange, showHint, applyRestrictedHandlers]);
 
   return null;
 }

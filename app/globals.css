@@ -619,6 +619,11 @@ body.map-fullscreen-active {
   font-family: inherit;
 }
 
+/* 手機 / 平板限制模式：禁止瀏覽器整頁 pinch，改由 Leaflet 處理雙指 */
+.leaflet-container.leaflet-touch-restricted {
+  touch-action: none;
+}
+
 /* 手機 / 平板：單指操作地圖提示（參考 Tesla） */
 .map-touch-hint {
   position: absolute;
