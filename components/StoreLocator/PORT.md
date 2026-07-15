@@ -22,11 +22,11 @@ npm install leaflet react-leaflet lucide-react
 npm install -D @types/leaflet
 ```
 
-| 套件 | 用途 |
-|------|------|
-| `leaflet` / `react-leaflet` | 地圖 |
-| `lucide-react` | 圖示（可改成專案既有 icon） |
-| `tailwindcss` | 版面 utility class（`index.tsx` / `Map.tsx`） |
+| 套件                        | 用途                                          |
+| --------------------------- | --------------------------------------------- |
+| `leaflet` / `react-leaflet` | 地圖                                          |
+| `lucide-react`              | 圖示（可改成專案既有 icon）                   |
+| `tailwindcss`               | 版面 utility class（`index.tsx` / `Map.tsx`） |
 
 建議 Next.js 14+、React 18+。`Map.tsx` 需 client + `dynamic(..., { ssr: false })`。
 
@@ -46,9 +46,9 @@ const stores: Store[] = [
     phone: "02-1234-5678",
     lat: 25.0359,
     lng: 121.5645,
-    region: "taipei",          // 地區篩選用
-    imageUrl: "/store.jpg",    // 可選
-    detailUrl: "/stores/1",    // 可選（預留）
+    region: "taipei", // 地區篩選用
+    imageUrl: "/store.jpg", // 可選
+    detailUrl: "/stores/1", // 可選（預留）
   },
 ];
 
@@ -59,22 +59,22 @@ export default function Page() {
 
 ### Props
 
-| Prop | 型別 | 預設 | 說明 |
-|------|------|------|------|
-| `stores` | `Store[]` | （必填） | 門市資料 |
-| `title` | `string` | `"展示中心"` | 頁首標題 |
-| `className` | `string` | — | 外層 `main` 額外 class |
+| Prop        | 型別      | 預設         | 說明                   |
+| ----------- | --------- | ------------ | ---------------------- |
+| `stores`    | `Store[]` | （必填）     | 門市資料               |
+| `title`     | `string`  | `"展示中心"` | 頁首標題               |
+| `className` | `string`  | —            | 外層 `main` 額外 class |
 
 ### `Store` 欄位
 
-| 欄位 | 必填 | 說明 |
-|------|------|------|
-| `id` | ✓ | 唯一 id |
-| `name` / `address` / `phone` | ✓ | 顯示與搜尋 |
-| `lat` / `lng` | ✓ | 地圖座標 |
-| `region` | 建議 | 地區下拉篩選（見 `STORE_REGION_OPTIONS`） |
-| `imageUrl` | | 列表縮圖 |
-| `placeId` / `detailUrl` | | 預留 |
+| 欄位                         | 必填 | 說明                                      |
+| ---------------------------- | ---- | ----------------------------------------- |
+| `id`                         | ✓    | 唯一 id                                   |
+| `name` / `address` / `phone` | ✓    | 顯示與搜尋                                |
+| `lat` / `lng`                | ✓    | 地圖座標                                  |
+| `region`                     | 建議 | 地區下拉篩選（見 `STORE_REGION_OPTIONS`） |
+| `imageUrl`                   |      | 列表縮圖                                  |
+| `placeId` / `detailUrl`      |      | 預留                                      |
 
 地區選項與預設視角在 `lib.ts` 的 `STORE_REGION_OPTIONS`、`STORE_REGION_VIEWPORTS`，可依專案調整。
 
@@ -95,11 +95,11 @@ export default function Page() {
 
 ## 結構說明
 
-| 檔案 | 職責 |
-|------|------|
-| `index.tsx` | 篩選 UI、列表、串接狀態與地圖 |
-| `Map.tsx` | Leaflet 圖層、marker、控制項（體積最大，功能集中） |
-| `lib.ts` | 純邏輯與 hooks，方便單測或非 React 重用 |
-| `styles.css` | 列表、showroom、marker、popup、定位點動畫 |
+| 檔案         | 職責                                               |
+| ------------ | -------------------------------------------------- |
+| `index.tsx`  | 篩選 UI、列表、串接狀態與地圖                      |
+| `Map.tsx`    | Leaflet 圖層、marker、控制項（體積最大，功能集中） |
+| `lib.ts`     | 純邏輯與 hooks，方便單測或非 React 重用            |
+| `styles.css` | 列表、showroom、marker、popup、定位點動畫          |
 
 搬運時建議整包複製 `components/StoreLocator/`，再在頁面傳入 `stores` 即可。
